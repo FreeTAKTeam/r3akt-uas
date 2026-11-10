@@ -117,7 +117,6 @@ impl AppIdentity {
         &self.object_id
     }
 
-    #[allow(dead_code)] // Used by the publisher in task 5.
     pub(crate) fn private_identity(&self) -> &PrivateIdentity {
         &self.identity
     }

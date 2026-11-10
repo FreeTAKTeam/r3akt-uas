@@ -6,7 +6,7 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 # The publication path is optional: check it as well, and prove default builds carry none of it.
-cargo clippy -p r3akt-uas-app --all-targets --locked --features publish -- -D warnings
+cargo clippy -p r3akt-uas-app -p uas-sim --all-targets --locked --features r3akt-uas-app/publish,uas-sim/publish -- -D warnings
 cargo test -p r3akt-uas-app --locked --features publish
 default_tree=$(cargo tree -p r3akt-uas-app -e normal --locked)
 if grep -qE 'lxmf|reticulum' <<<"$default_tree"; then

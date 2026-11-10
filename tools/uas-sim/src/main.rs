@@ -3,6 +3,12 @@
 //!
 //! uas-sim [--count N]          write N samples (default 10) to stdout
 //! uas-sim --check FILE [...]   exit non-zero unless FILE matches the output
+//!
+//! Built with `--features publish` only (milestone 2a, host proof):
+//! `uas-sim --publish HOST:PORT HUB_DEST --store DIR [--seconds N] [--resend-at N]`
+//!   flies the orbit at 1 Hz with wall-clock fix times and publishes it to RCH;
+//!   `--resend-at N` re-sends the last fix's exact bytes once after N seconds.
+//!   Prints the publisher status as one JSON line per second.
 
 use std::fmt::Write as _;
 use std::process::ExitCode;
@@ -60,6 +66,7 @@ fn run(args: &[String]) -> Result<(), String> {
                     .ok_or("--count needs a number")?;
             }
             "--check" => check = Some(it.next().ok_or("--check needs a file")?.clone()),
+            "--publish" => return publish(args),
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -79,6 +86,79 @@ fn run(args: &[String]) -> Result<(), String> {
             }
         }
     }
+}
+
+#[cfg(not(feature = "publish"))]
+fn publish(_: &[String]) -> Result<(), String> {
+    Err("--publish needs a build with --features publish".into())
+}
+
+#[cfg(feature = "publish")]
+fn publish(args: &[String]) -> Result<(), String> {
+    use r3akt_uas_app::publish as p;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    let mut it = args.iter().skip_while(|a| *a != "--publish").skip(1);
+    let address = it.next().ok_or("--publish needs HOST:PORT")?;
+    let hub = it
+        .next()
+        .ok_or("--publish needs the hub destination hash")?;
+    let (mut store, mut seconds, mut resend_at) = (None, 60_u32, None);
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
+        let mut value = || it.next().ok_or(format!("{arg} needs a value"));
+        match arg.as_str() {
+            "--store" => store = Some(value()?.clone()),
+            "--seconds" => seconds = value()?.parse().map_err(|_| "--seconds needs a number")?,
+            "--resend-at" => {
+                resend_at = Some(
+                    value()?
+                        .parse::<u32>()
+                        .map_err(|_| "--resend-at needs a number")?,
+                );
+            }
+            _ => {}
+        }
+    }
+    let store = store.ok_or("--publish needs --store DIR")?;
+    p::publish_start(store, address.clone(), hub).map_err(|e| e.to_string())?;
+    for seq in 0..seconds {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_secs();
+        // The orbit's shape with wall-clock time: the hub ignores old and far-future fixes.
+        let sample = telemetry::TelemetrySample {
+            sample_time_s: now,
+            fix_time_s: now,
+            ..sim::sample(seq)
+        };
+        p::publish_offer_fix(sample);
+        if resend_at == Some(seq) {
+            p::publish_resend_last_fix();
+        }
+        std::thread::sleep(Duration::from_secs(1));
+        println!("{}", status_json(&p::publish_status()));
+    }
+    p::publish_stop();
+    println!("{}", status_json(&p::publish_status()));
+    Ok(())
+}
+
+#[cfg(feature = "publish")]
+fn status_json(s: &r3akt_uas_app::publish::PublishStatus) -> Value {
+    json!({
+        "state": format!("{:?}", s.state),
+        "destination_hash": s.destination_hash,
+        "object_id": s.object_id,
+        "hub_connected": s.hub_connected,
+        "create_sent": s.create_sent,
+        "fixes_sent": s.fixes_sent,
+        "last_sent_fix": s.last_sent_fix.as_ref().map(|f| json!({
+            "fix_time_s": f.fix_time_s, "lat": f.latitude_deg, "lon": f.longitude_deg,
+        })),
+        "last_error": s.last_error,
+    })
 }
 
 fn main() -> ExitCode {
