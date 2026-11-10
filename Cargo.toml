@@ -13,6 +13,16 @@ publish = false
 # Do not replace these with local implementations (see AGENTS.md).
 [workspace.dependencies]
 r3akt-map-core = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0" }
+# Milestone 2a publication path, used only behind r3akt-uas-app's `publish` feature.
+# One LXMF-rs revision: the one RCH c2bf78a pins (decision D-1).
+r3akt-profile-rch = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0" }
+lxmf-sdk = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879", default-features = false, features = ["std"] }
+lxmf-runtime = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879" }
+reticulum-rs-transport = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879" }
+reticulum-rs-core = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879" }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+base64 = "0.22"
+rand_core = { version = "0.6.4", features = ["getrandom"] }
 serde_json = "1.0"
 thiserror = "2.0"
 uniffi = "=0.28.3"

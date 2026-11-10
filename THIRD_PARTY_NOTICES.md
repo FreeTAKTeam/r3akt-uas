@@ -137,6 +137,13 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 | Component | Licence | Used by |
 |---|---|---|
 | r3akt-map-core (Reticulum Community Hub) | EPL-2.0 | `r3akt-uas-app` |
+| r3akt-profile-rch, r3akt-protocol (Reticulum Community Hub) | EPL-2.0 | `r3akt-uas-app`, `publish` feature only |
+| lxmf-sdk, lxmf-runtime, lxmf-wire, lxmf-propagation, reticulum-rs-core, reticulum-rs-transport (LXMF-rs) | EPL-2.0 OR GPL-2.0-or-later | `r3akt-uas-app`, `publish` feature only |
+| Tokio, rusqlite, tokio-serial, mio-serial, rmp-serde, rmpv | MIT | through LXMF-rs, `publish` feature only |
+| SQLite (bundled by libsqlite3-sys) | public domain; binding crate MIT | through LXMF-rs, `publish` feature only |
+| bzip2 and libbzip2 (bundled by bzip2-sys) | MIT OR Apache-2.0; libbzip2 under its own BSD-style licence | through LXMF-rs, `publish` feature only |
+| serialport | MPL-2.0 | through LXMF-rs, `publish` feature only |
+| ed25519-dalek, x25519-dalek | BSD-3-Clause | through LXMF-rs, `publish` feature only |
 | UniFFI 0.28.3 | MPL-2.0 | `r3akt-uas-app`, `tools/uniffi-bindgen` |
 | JNA 5.14.0 | Apache-2.0 OR LGPL-2.1-or-later | `native-bridge` |
 | DJI Mobile SDK 4.18 | DJI SDK licence (proprietary) | `dji4` variant only |
