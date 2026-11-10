@@ -87,8 +87,22 @@ One fresh reviewer read tasks 2 to 5 (commits `1978e2c`, `37e4a78`, `9eb6a82`, `
 | F9 | minor | The worker loop has no host test. | — | Accepted; the hub trace covers it. |
 | F10 | minor | Speed, course and accuracy are always sent; the simulator has them, a DJI source may not. | yes (`telemetry.rs`) | Noted at G-07: `TelemetrySample` needs optional values before a DJI source publishes (M3). |
 
+## Focused PRE: milestone 2 step 2b plan, revision 1 (10 November 2026)
+
+Two fresh reviewers read [the step 2b plan](../goals/m2-vertical-slice/PLAN-2b.md): one on readiness, one on buildability against RCH `f5822210`, LXMF-rs `9b972f9a` and REM `0cfa422`. Both returned **partially aligned, no blocker**. Nothing was built or run by them. "Checked" means re-read in the pinned source after the review.
+
+| # | Severity | Finding | Checked | Applied in revision 2 |
+|---|---|---|---|---|
+| B1, B2 | major | Membership is not matched by the app's identity hash: the hub records `reticulumd` announces with no identity hash, so both sender and REM recipients are matched by their `lxmf.delivery` hashes. The planned REM member (identity hash) would relay to nobody, and the identity-hash task is unnecessary. | yes (`r3akt-rch-server/src/lib.rs:2653`, `rem_team_directory.rs:81-110, 201-215`) | Members are added by delivery hash; the identity-hash task is dropped. |
+| R1 | major | "Correct position" overstated what REM shows: it settles at the relayed metadata position and does not follow the orbit. | yes (`sensor_telemetry.rs:117-124`, `sensor_relay_metadata.rs`) | Intent, outcome and evidence reworded; kill criterion against presenting REM evidence as tracking; acceptance records "appearance only". |
+| R2 | major | The riskiest assumption (REM applies a team-relayed object message) was proven last. | yes (REM `map_marker_receive.rs`, no R3S test in REM or RCH) | New task 0: REM relay spike with a stop rule, before any code. |
+| R3, B7 | major | Relay dispatch drops a queued snapshot that is no longer current; at 1 Hz with a lagging dispatch REM may receive nothing. | yes (`outbound.rs:43-60`, `sensor_telemetry.rs:357-389`) | Known limit; the relay trace records dispatch rejections; an interval option only if the proof needs it. |
+| R4 | major | Hub database and app store state for the proof were unspecified. | partly | D-8: fresh hub and store, plus one run with the 2a store. |
+| R5 | major | Hub and REM setup steps, operator, REM device and address were not named. | yes (`rem_team_directory.rs:45-52, 201-214`) | Task 0 names revisions, emulator address, operator and the exact calls. |
+| R6–R16, B3–B6, B8–B10 | minor | Upper-case team UIDs relay to nobody; `publish_start` signature change breaks simNet between tasks; incomplete task 1 file list (README, compatibility matrix); profile carrier table lacks field 11; mixed REM LXMF-rs revision; REM restart limit; UAS-PRF-008 belongs to the REM proof; further owner decisions; spike claims unrecorded; take-off-relative and unknown altitude cases; device clock behind the stored fix; LXMF-rs APIs unchanged (no action); Rust 1.89 compatible; no wire code forced here. | mostly | All applied as plan text (D-7 to D-9, file lists, tests, known limits). |
+
 ## Gate status
 
 - Milestone 1 (specification and scaffold): complete. The `ci` workflow builds from a clone on GitHub and passed, and the dji4 variant runs on a Pixel 7 (see the records in [acceptance.md](../specification/acceptance.md)).
 - PRE gate for milestone 2a: **passed on 10 November 2026.** The two blockers of the first focused PRE were ruled on by the owner, the second pass found no blocker, and its corrections are applied in plan revision 3. The POST review of the task 5 hub evidence (above) found no blocker; its corrections are applied and task 6 may start.
-- Milestone 2b (REM) and milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE (PRE finding 1).
+- Milestone 2b (REM): focused PRE on revision 1 found no blocker; revision 2 applies it. Starting needs the owner's rulings D-5 to D-9. Milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE.
