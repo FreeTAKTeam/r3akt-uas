@@ -20,7 +20,7 @@ SDK-advertised support and physically tested support are separate columns. No ai
 | Requirement | Status |
 |---|---|
 | DJI developer account and app key for package `org.r3akt.uas` (`djiApiKey` Gradle property, kept out of the repository) | required; without it the cockpit shows `NO DJI KEY` and the SDK is not started |
-| SDK activation/registration on first run (network needed once) | implemented; reaches DJI and shows DJI's error for an invalid key; success with a valid key unproven |
+| SDK activation/registration on first run (network needed once) | implemented; the registration call runs on Android 17 and the SDK's invalid-key error is shown. Whether that test reached DJI's servers is not established; success with a valid key is unproven |
 | `Helper.install` in `Application.attachBaseContext` (`com.cySdkyc.clx.Helper` in 4.18) | runs on a Pixel 7. It must run before any class that mentions a DJI type is initialized (`Dji4Loader`), or the DJI callback classes stay broken for the process |
 | `INTERNET`, `DJIAoaControllerActivity` with the SDK's `accessory_filter`, `org.apache.http.legacy` | in the dji4 manifest; USB accessory attach unproven (no controller) |
 | Runtime permissions (location, storage, phone state) | none requested; whether registration or connection needs them is unknown |

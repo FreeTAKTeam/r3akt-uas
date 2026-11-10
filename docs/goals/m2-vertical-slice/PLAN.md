@@ -1,30 +1,63 @@
-# Milestone 2: first vertical slice — task plan
+# Milestone 2: first vertical slice — task plan (revision 3)
 
-Status: **draft, awaiting a focused PRE review.** Not started.
+Status: **PRE gate passed for step 2a on 10 November 2026** (two focused PRE passes, no open blocker; corrections of the second pass applied in this revision). Not started. Findings and rulings are in [pre-review.md](../../integration/pre-review.md). A POST review of task 5's hub evidence gates task 6.
 
-**Intent:** one simulated aircraft travels through existing LXMF object-telemetry contracts and appears exactly once, at the correct position, on the RCH map and in REM.
+**Intent:** one simulated aircraft travels through existing LXMF contracts and appears exactly once, at the correct position, on the RCH map.
+**Expected outcome:** a hub operator sees one marker named as simulated that follows the simulator's orbit; restarting the publisher or replaying a fix never creates a second object.
+**Target-perspective output:** the hub operator inspects the RCH map and the hub store; the pilot sees the app's destination hash, publication state ("sent", never "accepted") and last sent fix in the test build.
 **Truth owner:** the simulator owns the aircraft state; RCH owns the canonical aircraft object and authorization; shared crates own every wire format.
-**Contract boundary:** `r3akt-uas-app` → `lxmf-runtime`/`lxmf-sdk` (in-process) → RCH ingest → RCH → REM forwarding.
-**Cutover:** none; `publication.enabled` stays off by default and is turned on only in the simulator test build.
-**Acceptance evidence:** RCH map record and screenshot plus REM screenshot showing one aircraft object marked simulated at the fixture position; RCH store shows no duplicate object after an app restart and a replayed sample.
-**Kill criteria:** any parallel transport, envelope or codec; aircraft position written as the app identity's own field-2 position; a second aircraft object after restart.
+**Contract boundary:** `r3akt-uas-app` → `r3akt-profile-rch` envelopes and `r3akt-map-core` R3S types → `lxmf-runtime` in-process backend over `reticulum-rs-transport` (one TCP client, announced `lxmf.delivery` destination) → RCH ingest.
+**Cutover:** none. Publication exists only behind the Cargo feature `publish`, in the host tool and the `simNet` test build, and starts only on an explicit operator action.
+**Displaced path:** none in this repository; FreeTAKUAS FTS/CoT networking is not imported.
+**Acceptance evidence:** RCH map screenshot and hub store output showing one aircraft object, marked simulated, at the last sent fix; the same count after a restart and after a replayed fix; app screenshot with the destination hash and last sent fix.
+**Kill criteria:** any parallel transport, envelope or codec written here; aircraft position sent as the app identity's own field-2 position; a second aircraft object after restart or replay; anything received over the network reaching a flight command (UAS-PRD-012); a default build (sim, dji4, CI) that contains the publisher.
 
-## Decisions required before task 1
+## Scope
 
-| ID | Decision | Input |
+Milestone 2 is delivered in two steps (owner ruling R-1):
+
+- **2a, this plan: hub first.** Position reaches the RCH map through contracts that exist at the pinned revisions. No change in RCH or REM, no re-pin.
+- **2b, not planned here: REM.** REM receives a push only when the message carries a team field the sender belongs to, and the complete object message needs a shared encoder that does not exist (G-15). Step 2b gets its own plan and PRE once G-15 is resolved upstream. The REM evidence of UAS-PRD-006 moves there.
+
+Not in 2a: the `uas` extension, session and sequence fields (UAS-PRF-006 beyond the source fix time), field 3 object telemetry, acting on anything received, a foreground service, DJI aircraft as the source.
+
+## Decisions and rulings (project owner, 10 November 2026)
+
+| ID | Decision | Chosen |
 |---|---|---|
-| D-1 | LXMF-rs revision set (G-08): RCH `c2bf78a` pins `888355c`; RCH HEAD pins `213af2d`. Pick one with RCH and record it as "qualified" after task 6. | RCH maintainers |
-| D-2 | App Reticulum identity: generated on first run, stored in Android private storage, never exported. | this repo |
-| D-3 | Aircraft object creation: the app creates the canonical marker through the existing authorized marker-creation command before any field-3 telemetry, so the writer binding exists (R3S: an unbound object cannot be claimed by its first tuple). | RCH contract at `c2bf78a` |
-| D-4 | Network gate: the `INTERNET` permission is added only to a `simNet` test configuration (or behind a settings switch defaulting off), preserving UAS-SCF-005 for default builds. | this repo |
+| D-1 | Revision set (G-08) | RCH `c2bf78a` with its pinned LXMF-rs `888355c`. Recorded as "qualified" only after task 6. |
+| D-2 | App Reticulum identity | Generated on first run, stored in Android private storage, never exported. A reinstall gives a new identity. |
+| D-3 | Aircraft object creation | The app creates the marker itself with `mission.marker.create` before any fix. Over LXMF the idempotency handle is the app-chosen `object_destination_hash` plus the `command_id` (the `Idempotency-Key` of the HTTP route does not exist here). |
+| D-4 | Network gate | Only a `simNet` test configuration can publish; the default simulator build keeps a manifest with no network permission (UAS-SCF-005). |
+| R-1 | Publish path | Hub first, REM next: the fix is sent as the existing R3S origin-fix event on field 13. |
+| R-2 | Transport | `reticulum-rs-transport` and `reticulum-rs-core` are allowed shared dependencies. This repository only constructs the transport, one TCP client interface, the announced delivery destination and the in-process backend; it adds no routing, queueing or interface-management logic. |
+
+## Wire path (read at the pinned revisions)
+
+1. **Connect and announce.** Construct the transport and one TCP client, register the `lxmf.delivery` destination of the app identity and announce it. The runtime does not announce by itself, and without the announce the hub's daemon cannot verify the sender.
+2. **Create**, its own message: `mission.marker.create` in a `MissionCommandEnvelope`, encoded by `r3akt_profile_rch::encode_commands`, which returns the complete one-entry fields map for field 9. Arguments: `object_destination_hash` (16 random bytes as lowercase hex), `name` containing `SIMULATED`, `category` and `symbol` `uav`, `lat`, `lon` (required). The encoded bytes are stored once and re-sent unchanged; they are never re-encoded, because the hub de-duplicates a byte-identical command by `command_id` and refuses the same id with different content.
+3. **Fix**, its own message: `r3akt_map_core::sensor_wire::SensorEvent::OriginFix` for that object id, as the payload of an `EventEnvelope`, encoded by `r3akt_profile_rch::encode_events` (field 13). The hub moves the marker when the sender holds `mission.content.write`, is the bound writer and the marker exists. No field 2, 3 or 11.
+4. **Send**: `SendRequest` with the encoded bytes in the `reticulum.fields_base64` extension, through `lxmf_runtime::InProcessBackend`. No fix is sent until the create's send returned success in this session. Command results that the hub sends back are received and dropped.
+
+Hub rules the client must respect: the create and a fix cannot share a message (the hub reads field 13 before field 9); a fix before the create is skipped silently; `fixAtMs` may be at most 30 s ahead of the hub clock; an older fix is ignored and an equal-time different fix is refused. At `c2bf78a` the symbol `uav` is stored as `drone` and the object's origin kind is `mobile` (G-19). The simulated mark travels in the marker name.
 
 ## Tasks (sequential)
 
-| # | Task | Files allowed | Evidence |
-|---|---|---|---|
-| 1 | Pin D-1 LXMF crates and `r3akt-profile-rch`, `r3akt-mesh-delivery` as git revs; extend `check_boundaries.py` `SHARED` | `Cargo.toml`, `Cargo.lock`, `scripts/check_boundaries.py` | `check.sh` green; `cargo tree` shows one LXMF revision |
-| 2 | Identity provisioning (D-2) via shared identity APIs | `crates/r3akt-uas-app/src/identity.rs`, `native-bridge` regen, Android settings | unit test: identity stable across restart, absent from logs |
-| 3 | Aircraft marker creation (D-3) with idempotency key | `crates/r3akt-uas-app/src/aircraft.rs` | fixture: same key after restart → same object id |
-| 4 | Field-3 publish: Telemeter + R3S origin position for the aircraft object, 1 Hz, through `lxmf-runtime` | `crates/r3akt-uas-app/src/publish.rs`, Android foreground service | trace of outgoing fields; no field-2 aircraft position |
-| 5 | Network gate (D-4) | `apps/android/app` manifests/flavors | merged manifests for default vs test build |
-| 6 | Recipient-side proof against a local RCH at the D-1 set, with REM attached (cross-repo: companion change C-RCH-4 is done in RCH if needed) | none here; evidence in `docs/evidence/` | RCH map + REM screenshots, RCH object count before/after restart and replay |
+| # | Task | Requirements | Files allowed | Evidence |
+|---|---|---|---|---|
+| 1 | **Dependency spike.** Behind a Cargo feature `publish` of `r3akt-uas-app`, pin `r3akt-profile-rch` (RCH `c2bf78a`), `lxmf-sdk` (`default-features = false`, `std`), `lxmf-runtime`, `reticulum-rs-transport` and `reticulum-rs-core` (LXMF-rs `888355c`), plus the plain crates they need here (`tokio`, `base64`, `rand_core`). Add the two transport crates to `SHARED` with the reason from R-2. `build-android-native.sh` takes the feature list as a second positional argument. `check.sh` gains clippy and test passes with `--features publish` and an assertion that the default feature set pulls no LXMF or Reticulum crate. Stop and record an upstream gap if the set needs a patch to a shared crate to build for Android. | UAS-ARC-002, UAS-ARC-009 | `Cargo.toml`, `Cargo.lock`, `crates/r3akt-uas-app/Cargo.toml`, `scripts/check_boundaries.py`, `scripts/build-android-native.sh`, `scripts/check.sh`, `THIRD_PARTY_NOTICES.md`, `docs/integration/existing-system-and-gaps.md` | `check.sh` green; `cargo tree` with the feature shows one LXMF-rs revision; the library builds for both Android ABIs with the feature; both default Gradle builds unchanged; library size with and without the feature recorded |
+| 2 | **Identity and object id** (D-2, D-3). When the store directory is empty, generate `rns_transport::identity::PrivateIdentity`, persist it with `rns_core::key_manager::FileKeyManager` in a directory the caller supplies, and store beside it the object id. Expose only the `lxmf.delivery` destination hash. | UAS-PRF-002 | `crates/r3akt-uas-app/src/identity.rs`, `src/lib.rs` | host tests: reload gives the same destination hash and object id; private key bytes never appear in `Debug` or error text |
+| 3 | **Create command.** Build the create message of the wire path once, from the first position, and store its encoded bytes beside the identity. Later starts send the stored bytes. The argument object is written by name because no shared crate exposes a typed builder (G-16). | UAS-PRF-003 | `crates/r3akt-uas-app/src/aircraft.rs`, `src/lib.rs` | host tests: stored bytes decode with the shared `decode_commands` to one `mission.marker.create` with the stored object id; a second start returns the same bytes |
+| 4 | **Fix publication.** Build the origin-fix event from a `TelemetrySample` with wall-clock fix time and unknown values left absent. The altitude is sent only with a known datum; a take-off-relative altitude is not sent as `altM` (G-07). | UAS-PRF-004, UAS-PRF-009, UAS-PRF-010 | `crates/r3akt-uas-app/src/publish.rs`, `src/lib.rs` | host test: the bytes decode with the shared `sensor_frame::decode` to exactly one origin fix for the object id and no samples |
+| 5 | **Runtime and host proof** (R-2). One worker thread owns the tokio runtime, the transport and the backend; `send` never runs on a caller's thread. It follows the wire path, keeps one latest-fix slot (a fix that cannot be sent is replaced, never queued) and retries the stored create bytes until a send succeeds. Exported functions carry the prefix `publish_`: start, offer a fix, resend the last fix, status, stop. `uas-sim --publish` drives it from the host against RCH built from a separate worktree at `c2bf78a`. This task also records the exact hub grant command, which hash the grant takes, and the store query used. | UAS-PRD-006 (RCH part), UAS-PRF-003, UAS-PRD-012 | `crates/r3akt-uas-app/src/publish.rs`, `src/lib.rs`, `tools/uas-sim/`, `docs/evidence/`, `docs/integration/existing-system-and-gaps.md` | hub store output and RCH map screenshot: one marker and one origin for the object id, moving with the orbit; the same after stopping and restarting the tool and after resending the last fix; trace of outgoing field numbers (9, then 13 only); G-17 confirmed or withdrawn. **POST review of this evidence before task 6.** |
+| 6 | **Android gate and device proof** (D-4). `cargoBuild` declares the Gradle property `r3aktPublish` as an input and passes the feature to the script. `androidComponents.beforeVariants` enables `simNet` only when the property is set and `sim` and `dji4` only when it is not, so one build holds either the default variants without the publisher or `simNet` with it. The simulator source moves to `app/src/simCommon/kotlin`, shared by `sim` and `simNet`, each with its own `Variant.kt`. `simNet` carries `INTERNET`, shows the destination hash, state and last sent fix, starts on an operator tap and stops when the cockpit leaves the foreground. `app/src/main/` may gain one source-neutral hook for that tap (a no-op by default). Hub host, port and destination hash come from Gradle properties outside the repository. CI stays on the default variants and asserts that their native libraries contain no `uniffi_r3akt_uas_app_fn_func_publish` symbol and that the sim manifest has no `INTERNET`. Then repeat task 5's proof from the device, with the device clock within 30 s of the hub. | UAS-SCF-005, UAS-PRD-012, UAS-ARC-011, UAS-ARC-010 | `scripts/build-android-native.sh`, `apps/android/native-bridge/build.gradle.kts`, `apps/android/app/build.gradle.kts`, `apps/android/app/src/sim/`, `apps/android/app/src/simCommon/`, `apps/android/app/src/simNet/`, `apps/android/app/src/main/` (the one hook), `.github/workflows/ci.yml`, `packaging/android/`, `docs/evidence/`, `docs/specification/acceptance.md`, `docs/specification/architecture.md`, `docs/integration/reuse-matrix.md` | merged manifests (sim without `INTERNET`, `simNet` with it); CI assertions green; RCH map screenshot, hub store output and app screenshot after launch, after force-stop and relaunch, and after a resent fix |
+
+Tasks 2 to 5 run on the host without Android. Nothing in this plan changes RCH, REM or LXMF-rs; if task 5 shows that the hub at `c2bf78a` needs a change, the milestone stops and the plan is revised.
+
+## Known limits accepted for 2a
+
+- A reinstall gives a new identity and object id and leaves the old marker for the hub operator to delete.
+- The app reports "sent", never "accepted": it does not read command results. If the hub refuses the create (for example before the grant), an identical create is ignored afterwards and fixes are skipped silently. Recovery in the test build is clearing the store and granting the new identity; publishing therefore starts only after the grant.
+- The identity key is a plain file in app-private storage (`allowBackup` is off).
+- RCH at `c2bf78a` authorizes the message source without checking that its daemon verified the signature (G-18). The app announces so that verification is possible.
+- Publishing runs only while the cockpit is in front; the foreground service arrives with the DJI source.

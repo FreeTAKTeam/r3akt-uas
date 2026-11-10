@@ -18,4 +18,4 @@ Status: **specified, not started.** Each change is made in its own repository un
 | C-REM-1 | Keep consuming standard markers/telemetry unchanged when `uas` is present (baseline compatibility, UAS-PRF-008). | Old fixtures still pass; screenshot of an aircraft marker on an unmodified REM build. |
 | C-REM-2 | Narrow presentation extension: show aircraft altitude with its datum, heading, and sensor/FOV state from R3S. | REM screenshots from the receiving device. |
 
-Ordering: C-RCH-1 and C-REM-1 before milestone 3 data is published; C-RCH-4 is the milestone 2 gate.
+Ordering: C-RCH-1 and C-REM-1 before milestone 3 data is published. C-RCH-4 needs no RCH change for milestone 2a: RCH at `c2bf78a` already keeps the aircraft as its own R3S origin when the fix arrives as an origin-fix event. Reaching REM (step 2b) needs the shared encoder of G-15 first.

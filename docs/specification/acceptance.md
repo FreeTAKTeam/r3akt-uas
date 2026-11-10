@@ -2,12 +2,12 @@
 
 Every requirement ID defined in the specification appears exactly once in the table below. `scripts/check_docs.py` fails when an ID is defined but untraced, traced but undefined, or referenced in code but undefined.
 
-Status values: **specified** (no implementation), **scaffold-proven** (shown by the evidence named, in the scope named), **implemented but unproven** (code exists, required evidence not yet captured). No product milestone (2–6) has passed. The PRE and POST reviews and their resolutions are recorded in [pre-review.md](../integration/pre-review.md); milestone 2 starts only after the focused PRE on [its task plan](../goals/m2-vertical-slice/PLAN.md).
+Status values: **specified** (no implementation), **scaffold-proven** (shown by the evidence named, in the scope named), **implemented but unproven** (code exists, required evidence not yet captured). No product milestone (2–6) has passed. The PRE and POST reviews and their resolutions are recorded in [pre-review.md](../integration/pre-review.md); the focused PRE on the [milestone 2 task plan](../goals/m2-vertical-slice/PLAN.md) passed for step 2a on 10 November 2026.
 
 ## Milestones
 
 1. Specification and scaffold (this milestone).
-2. First vertical slice: simulator → existing LXMF telemetry/object contracts → RCH map → REM; one aircraft identity, correct position, no duplicate objects.
+2. First vertical slice: simulator → existing LXMF telemetry/object contracts → RCH map → REM; one aircraft identity, correct position, no duplicate objects. Delivered in two steps by owner ruling of 10 November 2026: 2a the RCH map, 2b REM.
 3. UAS and sensor integration: shared profile additions, R3S pose/FOV, observations, events, RCH/REM projections.
 4. Android flight experience: DJI connection, local controls, video preview, radar, lifecycle recovery, capability gating.
 5. Media, detection and offline qualification.
@@ -38,7 +38,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRD-003 | 4, 6 | Compatibility matrix with physically tested rows | specified |
 | UAS-PRD-004 | 4 | Hardware flight evidence per action | implemented but unproven (take-off, landing, RTH, photo, video preview); recording and gimbal control specified |
 | UAS-PRD-005 | 4 | Radar evidence (see Radar) | specified |
-| UAS-PRD-006 | 2, 3 | RCH and REM recipient-side map evidence | specified |
+| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | specified |
 | UAS-PRD-007 | 5 | TCP and RNode operation evidence | specified |
 | UAS-PRD-008 | 5 | Detection promotion evidence | specified |
 | UAS-PRD-009 | 5 | MediaMTX playback evidence | specified |
@@ -103,7 +103,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-SCF-002 | 1 | Sim APK contains no `dji` entries; built with empty `djiApiKey` | scaffold-proven |
 | UAS-SCF-003 | 1, 4 | `:app:assembleDji4Debug` builds and runs on a Pixel 7 (arm64, Android 17) | scaffold-proven |
 | UAS-SCF-004 | 1 | Emulator screenshot of shared encode/decode via generated bindings | scaffold-proven |
-| UAS-SCF-005 | 1, 4 | Sim merged manifest has no INTERNET/USB permission and runs offline. The dji4 variant carries INTERNET and the DJI USB accessory activity; built without `djiApiKey` (the default) it never starts the SDK manager and shows `NO DJI KEY` on a Pixel 7. With a key it registers with DJI and listens for an aircraft; it publishes nothing. | scaffold-proven (sim; dji4 without a key) |
+| UAS-SCF-005 | 1, 2, 4 | Sim merged manifest has no INTERNET/USB permission and runs offline. The dji4 variant carries INTERNET and the DJI USB accessory activity; built without `djiApiKey` (the default) it never starts the SDK manager and shows `NO DJI KEY` on a Pixel 7. With a key it registers with DJI and listens for an aircraft; it publishes nothing. | scaffold-proven (sim; dji4 without a key) |
 | UAS-SCF-006 | 1 | `uas-sim --check fixtures/telemetry/sim-orbit-v1.jsonl` | scaffold-proven |
 | UAS-SCF-007 | 1 | `packaging/` examples contain no credentials | scaffold-proven |
 | UAS-SCF-008 | 1 | `scripts/check.sh` passes locally; the `ci` workflow passed on GitHub for `bc5c54b`, `79c7c90` (main) and `d61c86b` | scaffold-proven |
@@ -116,7 +116,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 - Android: `:app:assembleSimDebug` (≈1.7 MB, `libr3akt_uas_app.so` for arm64-v8a and x86_64, no DJI entries) and `:app:assembleDji4Debug` (≈90 MB) build.
 - Operator view: the simulator APK on an API 35 x86_64 emulator shows sample 0 encoded by the shared `r3akt-map-core` encoder (90 bytes) and decoded by the shared decoder: [screenshot](../evidence/scaffold-sim-emulator-api35.png).
 - DJI 4 variant: it failed to start with `ClassNotFoundException: dji.sdk.sdkmanager.DJISDKManager`. The cause recorded here at the time (no x86_64 native libraries) was wrong: a static initializer used a DJI class before the SDK's class loader was installed. Corrected in the milestone 4 record below.
-- Receiving-client evidence (RCH map, REM) does not apply to the scaffold: nothing is published. It is the milestone 2 gate.
+- Receiving-client evidence (RCH map, REM) does not apply to the scaffold: nothing is published. It is the milestone 2 gate (RCH map in step 2a, REM in step 2b).
 
 ## Milestone 4 evidence record (10 November 2026, partial)
 
@@ -126,7 +126,7 @@ Milestone 4 has **not** passed: no aircraft or remote controller has been connec
 - DJI 4 variant, default build (no key): starts, shows `NO DJI KEY`, every value unknown, every action disabled, and the SDK manager is never started: [screenshot](../evidence/m4-dji4-pixel7-no-key.png). The same build also starts on the API 35 x86_64 emulator.
 - Simulator variant: runs on the Pixel 7 with the `SIMULATED` badge: [screenshot](../evidence/m4-sim-pixel7.png).
 - Test-only build (dummy app key, actions forced on; neither is in the repository):
-  - DJI registration runs on Android 17 and DJI's answer is shown verbatim ("The app key submitted is invalid…"): [screenshot](../evidence/m4-dji4-pixel7-log-testbuild.png).
+  - The DJI registration call runs on Android 17 and the SDK's error is shown verbatim ("The app key submitted is invalid…"); the test did not establish whether the SDK reached DJI's servers: [screenshot](../evidence/m4-dji4-pixel7-log-testbuild.png).
   - A tap or a partial slide on the confirm control sends nothing; a full slide sends the command once.
   - Without an aircraft the command is refused at once and shown as `REJECTED · NOT RETRIED` until dismissed: [screenshot](../evidence/m4-dji4-pixel7-confirm-and-rejection-testbuild.png).
   - Nothing is sent after the app is backgrounded and resumed.
