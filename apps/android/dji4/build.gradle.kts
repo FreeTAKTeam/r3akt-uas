@@ -17,6 +17,8 @@ android {
 }
 
 dependencies {
+    // Generated Rust bindings: DJI value normalization (UAS-ARC-005).
+    implementation(project(":native-bridge"))
     api(libs.dji.sdk)
     implementation(libs.appcompat)
     implementation(libs.constraintlayout)

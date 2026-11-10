@@ -14,7 +14,11 @@ MEMBERS = {"r3akt-uas-app", "uas-sim", "r3akt-uas-uniffi-bindgen"}
 FORBIDDEN_PREFIXES = ("rmp", "msgpack", "reticulum", "rns-", "lxmf", "zeromq", "zmq")
 # Shared crates may be added here as milestones adopt them (git dependencies only).
 SHARED = {"r3akt-map-core", "r3akt-profile-rch", "r3akt-protocol", "r3akt-mesh-delivery",
-          "lxmf-sdk", "lxmf-runtime"}
+          "lxmf-sdk", "lxmf-runtime",
+          # Owner ruling R-2 (milestone 2a): lxmf-runtime needs the host to construct the
+          # transport and identity. Construction calls only; no routing, queueing or
+          # interface-management logic belongs in this repository.
+          "reticulum-rs-transport", "reticulum-rs-core"}
 
 meta = json.loads(subprocess.check_output(
     ["cargo", "metadata", "--format-version", "1", "--no-deps", ]))

@@ -3,6 +3,8 @@ package org.r3akt.uas
 import org.r3akt.uas.bridge.decodeTelemetry
 import org.r3akt.uas.bridge.encodeTelemetry
 import org.r3akt.uas.bridge.sample
+import org.r3akt.uas.hud.HudState
+import kotlin.math.roundToInt
 
 object Variant {
     /** Simulated aircraft through the shared Telemeter codec, in-process only. */
@@ -22,6 +24,24 @@ object Variant {
                 appendLine(decoded.json)
                 append("Network publication: disabled")
             }
+        }
+
+        // The simulated orbit has course, not heading (UAS-PRF-005), so heading stays unknown.
+        // It offers no flight actions: nothing pretends to take off or capture.
+        override fun cockpit(seq: UInt): HudState {
+            val s = sample(seq)
+            return HudState(
+                status = "IN FLIGHT",
+                simulated = s.simulated,
+                airborne = true,
+                groundSpeedMps = s.groundSpeedMps,
+                altitudeM = s.altitudeM,
+                altitudeReference = s.altitudeReference,
+                latitudeDeg = s.latitudeDeg,
+                longitudeDeg = s.longitudeDeg,
+                batteryPercent = s.batteryPercent?.roundToInt(),
+                flightTimeS = seq.toLong(),
+            )
         }
     }
 }

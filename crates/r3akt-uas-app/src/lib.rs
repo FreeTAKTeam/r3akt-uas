@@ -8,7 +8,9 @@
 #![allow(unsafe_code)] // Only UniFFI's generated scaffolding; hand-written code stays safe.
 uniffi::setup_scaffolding!();
 
+pub mod dji;
 pub mod sim;
 pub mod telemetry;
 
+pub use dji::{AircraftPose, DjiFlightState, normalize_dji};
 pub use telemetry::{AltitudeReference, DecodedTelemetry, TelemetrySample, UasError};

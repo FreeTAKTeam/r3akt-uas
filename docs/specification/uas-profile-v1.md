@@ -12,7 +12,8 @@ The profile is an optional `uas` object inside the existing normalized telemetry
 
 | Data | Carrier | Status |
 |---|---|---|
-| Aircraft position | LXMF field 3 object telemetry: canonical object hash + Telemeter sensor map (sensor 2 only when complete and MSL) + R3S SID 128 origin/sensor readings | existing |
+| Aircraft position | R3S origin position of the canonical object: the `mission.registry.origin.telemetry.upsert` event on LXMF field 13 (`r3akt-map-core` `OriginFixEvent` through `r3akt-profile-rch` `encode_events`) | existing; used by milestone 2a |
+| Aircraft sensor readings | LXMF field 3 object telemetry: canonical object hash + Telemeter sensor map (sensor 2 only when complete and MSL) + R3S SID 128 readings | existing on the hub; no public client encoder for the complete message (G-15) |
 | `uas` telemetry/sensor extension fields marked **new** | Proposed: one additional numeric Telemeter sensor ID in the same field 3 sensor map, allocated and validated by `r3akt-map-core`, at most 512 encoded bytes (the R3S extension budget). Old clients may drop unknown sensor IDs when repacking; standard sensors stay valid. | **decision pending (G-01), blocks M3** |
 | Events | LXMF field 9 (`FIELD_COMMANDS`) command `mission.registry.log_entry.upsert` via `r3akt-profile-rch` | existing; UAS vocabulary new (G-02) |
 | Observations promoted to markers | Existing marker creation + mission association commands (field 9) | existing |
@@ -34,7 +35,7 @@ Logical profiles: `rch.uas.telemetry.v1`, `rch.uas.sensor.v1`, `rch.uas.observat
 | **UAS-PRF-007** | Encoding uses the shared MessagePack codecs and standard telemetry units, with explicit conversion at the DJI boundary (for example ground speed m/s to Telemeter km/h). |
 | **UAS-PRF-008** | A receiver without UAS support still gets valid standard telemetry and markers. |
 | **UAS-PRF-009** | Unknown values stay unknown (nil/absent); nothing is fabricated or defaulted to look measured. |
-| **UAS-PRF-010** | Aircraft position is published on the existing independent-object stream (LXMF field 3, canonical object hash, R3S origin position). It never replaces the controller's own position (field 2). |
+| **UAS-PRF-010** | Aircraft position is published as the R3S origin position of the canonical aircraft object (origin-fix event, LXMF field 13); the field 3 object stream carries that object's sensor readings. It never replaces the controller's own position (field 2). |
 | **UAS-PRF-011** | Every field below states type, unit, optionality, source, timestamp semantics and mapping. A field without an existing slot is marked **new** and belongs to the named owning crate. |
 
 Column key: **Opt** R = required, O = optional (absent when unknown). **Time**: which clock the value belongs to.

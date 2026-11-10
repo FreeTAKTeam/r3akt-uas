@@ -11,11 +11,28 @@ publish.workspace = true
 [lib]
 crate-type = ["rlib", "cdylib"]
 
+[features]
+# Publication to RCH (milestone 2a). Off by default: default builds contain no
+# LXMF or Reticulum code and cannot publish (UAS-SCF-005).
+publish = [
+    "dep:r3akt-profile-rch", "dep:lxmf-sdk", "dep:lxmf-runtime",
+    "dep:reticulum-rs-transport", "dep:reticulum-rs-core",
+    "dep:tokio", "dep:base64", "dep:rand_core",
+]
+
 [dependencies]
 r3akt-map-core.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 uniffi.workspace = true
+r3akt-profile-rch = { workspace = true, optional = true }
+lxmf-sdk = { workspace = true, optional = true }
+lxmf-runtime = { workspace = true, optional = true }
+reticulum-rs-transport = { workspace = true, optional = true }
+reticulum-rs-core = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+rand_core = { workspace = true, optional = true }
 
 # Workspace lints forbid unsafe code; UniFFI's generated FFI scaffolding needs it,
 # so this crate denies it instead and the scaffolding macro allows it locally.
