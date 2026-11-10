@@ -9,6 +9,8 @@
 uniffi::setup_scaffolding!();
 
 pub mod dji;
+#[cfg(feature = "publish")]
+pub mod identity;
 pub mod sim;
 pub mod telemetry;
 
