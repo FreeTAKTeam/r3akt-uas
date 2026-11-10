@@ -1,7 +1,9 @@
 package org.r3akt.uas
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -69,8 +71,19 @@ class MainActivity : Activity() {
         }
         root = FrameLayout(this).apply { addView(hud) }
         setContentView(root)
-        Variant.source.start(this)
+        // Android 17 makes INTERNET a runtime permission; DJI registration needs it on first run.
+        if (checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {
+            Variant.source.start(this)
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.INTERNET), INTERNET_REQUEST)
+        }
         hideSystemBars()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // Started either way: a refusal shows up as DJI's own registration error in the LOG.
+        if (requestCode == INTERNET_REQUEST) Variant.source.start(this)
     }
 
     override fun onResume() {
@@ -108,5 +121,9 @@ class MainActivity : Activity() {
             .setView(ScrollView(this).apply { addView(text) })
             .setPositiveButton(android.R.string.ok, null)
             .show()
+    }
+
+    private companion object {
+        const val INTERNET_REQUEST = 1
     }
 }
