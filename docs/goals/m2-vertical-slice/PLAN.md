@@ -1,6 +1,6 @@
 # Milestone 2: first vertical slice — task plan (revision 3)
 
-Status: **PRE gate passed for step 2a on 10 November 2026** (two focused PRE passes, no open blocker; corrections of the second pass applied in this revision). Tasks 1 to 5 done; the POST review of task 5's hub evidence found no blocker and its corrections are applied, so task 6 may start. Findings and rulings are in [pre-review.md](../../integration/pre-review.md).
+Status: **PRE gate passed for step 2a on 10 November 2026** (two focused PRE passes, no open blocker; corrections of the second pass applied in this revision). Tasks 1 to 6 done (evidence in `docs/evidence/m2a-task5-hub-host-proof.md` and `m2a-task6-device-proof.md`); step 2a awaits owner acceptance. The RCH map view is blocked by G-20 (RCH #305). Findings and rulings are in [pre-review.md](../../integration/pre-review.md).
 
 **Intent:** one simulated aircraft travels through existing LXMF contracts and appears exactly once, at the correct position, on the RCH map.
 **Expected outcome:** a hub operator sees one marker named as simulated that follows the simulator's orbit; restarting the publisher or replaying a fix never creates a second object.

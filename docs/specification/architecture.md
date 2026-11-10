@@ -50,4 +50,4 @@ Camera RTMP ─────────────────► MediaMTX ─�
 
 ## Scaffold state
 
-Present: `r3akt-uas-app` links `r3akt-map-core` at the RCH baseline and exposes Telemeter encode/decode and a deterministic simulator through UniFFI; the Android `sim` and `dji4` variants build. Not present: any LXMF/Reticulum dependency, publication, persistence or DJI registration. Those arrive with milestone 2 and later.
+Present: `r3akt-uas-app` links `r3akt-map-core` at the RCH baseline and exposes Telemeter encode/decode and a deterministic simulator through UniFFI; the Android `sim` and `dji4` variants build. Milestone 2a adds, behind the Cargo feature `publish`, the app identity, the stored marker create and the origin-fix publisher over `lxmf-runtime`'s in-process backend with one TCP client; only the `simNet` test variant (Gradle property `r3aktPublish`, which disables `sim` and `dji4` in the same build) contains it. Default builds still contain no LXMF/Reticulum code. REM delivery, RNode and a DJI source as publisher arrive later.

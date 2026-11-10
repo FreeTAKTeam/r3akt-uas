@@ -18,3 +18,13 @@ djiApiKey=<key from developer.dji.com>
 ```
 
 The first registration needs network access once. Without a key the cockpit shows `NO DJI KEY` and nothing connects.
+
+## RCH publish test build (milestone 2a)
+
+The `simNet` variant publishes the simulator to an RCH hub. It is built only on request and never by CI; the same build then contains no `sim` or `dji4` variant. Hub settings come from Gradle properties outside the repository:
+
+```bash
+./gradlew -Pr3aktPublish=true -Pr3aktHubAddress=<host>:4242 -Pr3aktHubDestination=<hub lxmf.delivery hash> :app:assembleSimNetDebug
+```
+
+Publishing starts from LOG → START PUBLISH and stops when the cockpit leaves the foreground. The hub operator must grant `mission.content.write` to the app destination hash shown in the log before fixes are applied.
