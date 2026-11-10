@@ -55,7 +55,7 @@ class PublishingSimulator : SimulatorSource() {
         publishing = true
         worker.execute {
             startError = runCatching {
-                publishStart(storeDir, BuildConfig.HUB_ADDRESS, BuildConfig.HUB_DESTINATION)
+                publishStart(storeDir, BuildConfig.HUB_ADDRESS, BuildConfig.HUB_DESTINATION, null)
             }.exceptionOrNull()?.let { it.message ?: it.toString() }
             if (startError != null) publishing = false
         }
@@ -85,6 +85,7 @@ class PublishingSimulator : SimulatorSource() {
             appendLine("hub destination ${BuildConfig.HUB_DESTINATION.ifEmpty { "(r3aktHubDestination not set)" }}")
             appendLine("app destination hash ${s.destinationHash ?: "(starts with the first publish)"}")
             appendLine("aircraft object id ${s.objectId ?: "-"}")
+            appendLine("team ${s.teamUid ?: "none (field 13 only)"}")
             appendLine("state ${s.state.name}${if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""}")
             appendLine("hub connected ${s.hubConnected}, create sent ${s.createSent}, fixes sent ${s.fixesSent}")
             val fix = s.lastSentFix

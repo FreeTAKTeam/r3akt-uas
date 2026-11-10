@@ -28,7 +28,7 @@ Status: **PRE gate passed on 10 November 2026** (focused PRE on revision 1, no b
 |---|---|---|
 | D-5 | Revision set | Re-pin both RCH crates to `f5822210da63ce303ee86ffa95d67e0db5e12b3d` and LXMF-rs to `9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1` (the set RCH `f5822210` pins) and raise the toolchain to Rust 1.89, which that set requires. The `publish.rs` LXMF-rs APIs are byte-identical between `888355c` and `9b972f9a`. Includes the G-20 fix. |
 | D-6 | REM movement | 2b proves "appears once, no duplicate, at the relayed metadata position" with REM `0cfa422` unchanged. Movement on REM is C-REM-3 in the REM repository; 2b does not wait for it, and the REM part of UAS-PRD-006 is recorded as "appearance only". |
-| D-7 | Team | BLUE on the test hub. The app takes the team UID as a Gradle property (`r3aktTeamUid`) or `uas-sim --team`, lower-cases it and accepts only a canonical colour UID. |
+| D-7 | Team | BLUE on the test hub. The app takes the team UID as a Gradle property (`r3aktTeamUid`) or `uas-sim --team`, lower-cases it and checks it is 32 hex. The canonical-team list stays the hub's: it lives in RCH's hub core, not a shared crate, so copying it here would duplicate hub data (task 2 note). |
 | D-8 | Hub and store state for the proof | Fresh hub database and fresh app store for the REM proof; one extra run with the 2a store against the fresh hub shows the old create bytes are accepted. |
 | D-9 | Two fix paths | Keep both: no team → 2a's field-13 message (byte-identical); team → shared object message. |
 

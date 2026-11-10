@@ -13,7 +13,8 @@ The profile is an optional `uas` object inside the existing normalized telemetry
 | Data | Carrier | Status |
 |---|---|---|
 | Aircraft position | R3S origin position of the canonical object: the `mission.registry.origin.telemetry.upsert` event on LXMF field 13 (`r3akt-map-core` `OriginFixEvent` through `r3akt-profile-rch` `encode_events`) | existing; used by milestone 2a |
-| Aircraft sensor readings | LXMF field 3 object telemetry: canonical object hash + Telemeter sensor map (sensor 2 only when complete and MSL) + R3S SID 128 readings | existing on the hub; no public client encoder for the complete message (G-15) |
+| Aircraft sensor readings | LXMF field 3 object telemetry: canonical object hash + Telemeter sensor map (sensor 2 only when complete and MSL) + R3S SID 128 readings | existing; the complete object message (fields 3, 11, 13) is encoded by `r3akt-map-core` `sensor_wire::encode_object_fields` (RCH `f5822210`, G-15 fixed); milestone 2b sends it with no sensors |
+| Team scope | LXMF field 11: the RCH canonical team UID (lower-case 32 hex). RCH relays an object update to that team's REM members only when the sender is a member. | existing; used by milestone 2b |
 | `uas` telemetry/sensor extension fields marked **new** | Proposed: one additional numeric Telemeter sensor ID in the same field 3 sensor map, allocated and validated by `r3akt-map-core`, at most 512 encoded bytes (the R3S extension budget). Old clients may drop unknown sensor IDs when repacking; standard sensors stay valid. | **decision pending (G-01), blocks M3** |
 | Events | LXMF field 9 (`FIELD_COMMANDS`) command `mission.registry.log_entry.upsert` via `r3akt-profile-rch` | existing; UAS vocabulary new (G-02) |
 | Observations promoted to markers | Existing marker creation + mission association commands (field 9) | existing |

@@ -17,7 +17,7 @@ use lxmf_runtime::{
 };
 use lxmf_sdk::{SdkBackend, SendRequest};
 use r3akt_map_core::sensor::{AltitudeDatum, OriginPosition};
-use r3akt_map_core::sensor_wire::{OriginFixEvent, SensorEvent};
+use r3akt_map_core::sensor_wire::{OriginFixEvent, SensorEvent, encode_object_fields};
 use r3akt_profile_rch::{EventEnvelope, RchSource, encode_events};
 use rns_transport::destination::{DestinationName, SingleInputDestination};
 use rns_transport::identity::PrivateIdentity;
@@ -38,8 +38,10 @@ pub enum FixError {
     Encode(String),
 }
 
-/// Encodes `sample` as one origin-fix event for the aircraft object: the LXMF
-/// fields map holding field 13 only.
+/// Encodes `sample` as the aircraft object's fix message. Without a team it is
+/// one origin-fix event (field 13 only, step 2a); with a team it is the shared
+/// object message of `sensor_wire::encode_object_fields` (fields 3, 11 and 13),
+/// which RCH relays to REM members of that team (step 2b).
 ///
 /// `fix_time_s` must be wall-clock time; the hub ignores older fixes and
 /// refuses fixes more than 30 s ahead of its clock.
@@ -47,10 +49,19 @@ pub enum FixError {
 /// # Errors
 /// [`FixError::Invalid`] when shared validation rejects the values,
 /// [`FixError::Encode`] when the shared encoder fails.
-pub fn fix_message(identity: &AppIdentity, sample: &TelemetrySample) -> Result<Vec<u8>, FixError> {
+pub fn fix_message(
+    identity: &AppIdentity,
+    sample: &TelemetrySample,
+    team: Option<&str>,
+) -> Result<Vec<u8>, FixError> {
+    let position = origin_position(sample);
+    if let Some(team) = team {
+        return encode_object_fields(identity.object_id(), Some(&position), &[], Some(team))
+            .map_err(FixError::Invalid);
+    }
     let event = SensorEvent::OriginFix(OriginFixEvent {
         origin_id: identity.object_id().to_owned(),
-        position: origin_position(sample),
+        position,
     });
     event.validate().map_err(FixError::Invalid)?;
     // The shared event serializes as `{event_type, payload}`, as the hub's own producer does.
@@ -105,6 +116,8 @@ pub struct PublishStatus {
     pub fixes_sent: u64,
     pub last_sent_fix: Option<TelemetrySample>,
     pub last_error: Option<String>,
+    /// RCH team UID carried in field 11, or `None` for the field-13-only message.
+    pub team_uid: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq, uniffi::Error)]
@@ -141,22 +154,21 @@ fn update(f: impl FnOnce(&mut PublishStatus)) {
 /// Starts publishing to the hub at `hub_address` (`host:port`, Reticulum TCP)
 /// whose `lxmf.delivery` destination is `hub_destination`. Identity and create
 /// command live in `store_dir`. Nothing is sent before the first offered fix.
+/// With `team_uid` (an RCH canonical team UID) fixes go out as the shared object
+/// message that the hub relays to that team's REM members.
 ///
 /// # Errors
 /// [`PublishError::AlreadyRunning`], or [`PublishError::Config`] for a
-/// malformed hub destination.
+/// malformed hub destination or team UID.
 #[uniffi::export]
 pub fn publish_start(
     store_dir: String,
     hub_address: String,
     hub_destination: &str,
+    team_uid: Option<String>,
 ) -> Result<(), PublishError> {
-    let hub = hub_destination.trim().to_ascii_lowercase();
-    if hub.len() != 32 || !hub.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(PublishError::Config {
-            reason: "hub destination must be 32 hex characters".to_owned(),
-        });
-    }
+    let hub = hex32(hub_destination, "hub destination")?;
+    let team = team_uid.map(|t| hex32(&t, "team UID")).transpose()?;
     let mut worker = WORKER
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -166,6 +178,7 @@ pub fn publish_start(
     update(|s| {
         *s = PublishStatus {
             state: PublishState::Connecting,
+            team_uid: team.clone(),
             ..STATUS_STOPPED
         };
     });
@@ -173,7 +186,13 @@ pub fn publish_start(
     let thread = std::thread::spawn(move || {
         // A panic in shared code must not leave the status claiming "Sent".
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            run(Path::new(&store_dir), &hub_address, &hub, &rx)
+            run(
+                Path::new(&store_dir),
+                &hub_address,
+                &hub,
+                team.as_deref(),
+                &rx,
+            )
         }))
         .unwrap_or_else(|_| Err("publisher worker panicked".to_owned()));
         update(|s| {
@@ -200,7 +219,21 @@ const STATUS_STOPPED: PublishStatus = PublishStatus {
     fixes_sent: 0,
     last_sent_fix: None,
     last_error: None,
+    team_uid: None,
 };
+
+/// Lower-cases a 32-hex hash. RCH matches team UIDs byte for byte against its
+/// lower-case canonical list, which stays the hub's (it is not a shared crate).
+fn hex32(value: &str, what: &str) -> Result<String, PublishError> {
+    let value = value.trim().to_ascii_lowercase();
+    if value.len() == 32 && value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        Ok(value)
+    } else {
+        Err(PublishError::Config {
+            reason: format!("{what} must be 32 hex characters"),
+        })
+    }
+}
 
 /// Offers the latest fix. It replaces any fix not yet sent; nothing is queued.
 #[uniffi::export]
@@ -292,6 +325,7 @@ fn run(
     dir: &Path,
     hub_address: &str,
     hub: &str,
+    team: Option<&str>,
     rx: &std::sync::mpsc::Receiver<Cmd>,
 ) -> Result<(), String> {
     let identity = AppIdentity::load_or_create(dir).map_err(|e| e.to_string())?;
@@ -382,7 +416,7 @@ fn run(
             update(|s| s.last_error = Some(format!("replay not sent: {error}")));
         }
         if let Some(sample) = slot.take() {
-            match fix_message(&identity, &sample) {
+            match fix_message(&identity, &sample, team) {
                 Err(error) => update(|s| s.last_error = Some(error.to_string())),
                 Ok(bytes) => {
                     if record_send(send(&bytes), &sample) {
@@ -452,14 +486,18 @@ mod tests {
         }
     }
 
-    fn decode_one(id: &AppIdentity, s: &TelemetrySample) -> OriginPosition {
-        let bytes = fix_message(id, s).unwrap();
+    const BLUE: &str = "43341e5c822d99857fa6e8641f2ca9c0";
+
+    fn decode_one(id: &AppIdentity, s: &TelemetrySample, team: Option<&str>) -> OriginPosition {
+        let bytes = fix_message(id, s, team).unwrap();
         let frame = sensor_frame::decode(&bytes, &id.destination_hash()).unwrap();
-        assert!(frame.samples.is_empty() && frame.diagnostics.is_empty());
+        assert!(frame.diagnostics.is_empty());
         let [SensorEvent::OriginFix(fix)] = frame.events.as_slice() else {
             panic!("expected exactly one origin fix, got {:?}", frame.events);
         };
         assert_eq!(fix.origin_id, id.object_id());
+        let fields = r3akt_map_core::msgpack::to_json(&bytes).unwrap();
+        assert_eq!(fields.get("11").and_then(|t| t.as_str()), team);
         fix.position.clone()
     }
 
@@ -468,24 +506,65 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("r3akt-uas-publish-{}", std::process::id()));
         let id = AppIdentity::load_or_create(&dir).unwrap();
 
-        let msl = decode_one(&id, &sample(AltitudeReference::Msl));
-        assert_eq!(
-            (msl.lat, msl.lon, msl.fix_at_ms),
-            (52.5, 13.4, 1_800_000_000_000)
-        );
-        assert_eq!(
-            (msl.alt_m, msl.altitude_datum),
-            (Some(30.0), AltitudeDatum::Msl)
-        );
+        for team in [None, Some(BLUE)] {
+            let msl = decode_one(&id, &sample(AltitudeReference::Msl), team);
+            assert_eq!(
+                (msl.lat, msl.lon, msl.fix_at_ms),
+                (52.5, 13.4, 1_800_000_000_000)
+            );
+            assert_eq!(
+                (msl.alt_m, msl.altitude_datum),
+                (Some(30.0), AltitudeDatum::Msl)
+            );
+            for reference in [
+                AltitudeReference::TakeoffRelative,
+                AltitudeReference::Unknown,
+            ] {
+                let unknown = decode_one(&id, &sample(reference), team);
+                assert_eq!(
+                    (unknown.alt_m, unknown.altitude_datum),
+                    (None, AltitudeDatum::Unknown)
+                );
+            }
+            let mut bad = sample(AltitudeReference::Msl);
+            bad.latitude_deg = 91.0;
+            assert!(matches!(
+                fix_message(&id, &bad, team),
+                Err(FixError::Invalid(_))
+            ));
+        }
+        // With a team the message is the shared object message (field 3 present);
+        // without one it is still step 2a's field-13-only message.
+        let with_team = fix_message(&id, &sample(AltitudeReference::Msl), Some(BLUE)).unwrap();
+        let without = fix_message(&id, &sample(AltitudeReference::Msl), None).unwrap();
+        let keys = |b: &[u8]| {
+            let mut k: Vec<String> = r3akt_map_core::msgpack::to_json(b)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
+            k.sort();
+            k
+        };
+        assert_eq!(keys(&with_team), ["11", "13", "3"]);
+        assert_eq!(keys(&without), ["13"]);
+    }
 
-        let relative = decode_one(&id, &sample(AltitudeReference::TakeoffRelative));
-        assert_eq!(
-            (relative.alt_m, relative.altitude_datum),
-            (None, AltitudeDatum::Unknown)
-        );
-
-        let mut bad = sample(AltitudeReference::Msl);
-        bad.latitude_deg = 91.0;
-        assert!(matches!(fix_message(&id, &bad), Err(FixError::Invalid(_))));
+    #[test]
+    fn team_uid_is_lower_cased_and_checked() {
+        assert_eq!(hex32(&BLUE.to_ascii_uppercase(), "team UID").unwrap(), BLUE);
+        for bad in [
+            "Blue",
+            "",
+            "43341e5c822d99857fa6e8641f2ca9c",
+            "43341e5c822d99857fa6e8641f2ca9cz",
+        ] {
+            assert!(matches!(
+                hex32(bad, "team UID"),
+                Err(PublishError::Config { .. })
+            ));
+        }
     }
 }
