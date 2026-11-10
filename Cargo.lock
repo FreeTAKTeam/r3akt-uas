@@ -1072,7 +1072,9 @@ source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=f58
 dependencies = [
  "base64",
  "chrono",
+ "r3akt-profile-rch",
  "rmp-serde",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
@@ -1112,6 +1114,7 @@ name = "r3akt-uas-app"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "lxmf-propagation",
  "lxmf-runtime",
  "lxmf-sdk",
  "r3akt-map-core",
@@ -1119,6 +1122,7 @@ dependencies = [
  "rand_core",
  "reticulum-rs-core",
  "reticulum-rs-transport",
+ "rusqlite",
  "serde_json",
  "thiserror 2.0.21",
  "tokio",

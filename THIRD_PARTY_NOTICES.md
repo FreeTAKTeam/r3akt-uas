@@ -8,7 +8,7 @@ Original code in this repository is licensed under EPL-2.0 (see `LICENSE`). The 
 
 - Source: https://github.com/FreeTAKTeam/FreeTAKUAS at `704f4aa3ba127ed4c090da2e30240971b6c55b55`
 - Licence: MIT. Some FreeTAKUAS files are TensorFlow examples under Apache-2.0; their headers are kept if imported.
-- Used: DJI SDK native-library packaging rules (`doNotStrip`/`pickFirst` lists, excludes) in `apps/android/app/build.gradle.kts`.
+- Used: DJI SDK native-library packaging rules (`doNotStrip`/`pickFirst` lists, excludes) in `apps/android/app/build.gradle.kts`; the GeoObject popup design (affiliation picker, Alpha–Zulu name with a counter) adapted in `apps/android/app/src/simNet/kotlin/org/r3akt/uas/MarkerPanel.kt`. Its ground-position code and CoT sending are not imported.
 
 ```
 MIT License

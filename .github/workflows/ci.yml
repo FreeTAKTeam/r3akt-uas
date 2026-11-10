@@ -48,7 +48,7 @@ jobs:
           for apk in apps/android/app/build/outputs/apk/{sim,dji4}/debug/app-*-debug.apk; do
             for lib in $(unzip -Z1 "$apk" 'lib/*/libr3akt_uas_app.so'); do
               # grep -c reads to the end: with pipefail, grep -q would kill unzip with SIGPIPE.
-              if unzip -p "$apk" "$lib" | grep -ac uniffi_r3akt_uas_app_fn_func_publish >/dev/null; then
+              if unzip -p "$apk" "$lib" | grep -acE "uniffi_r3akt_uas_app_fn_func_(publish|marker)_" >/dev/null; then
                 echo "$apk $lib contains the publisher" >&2; exit 1
               fi
             done

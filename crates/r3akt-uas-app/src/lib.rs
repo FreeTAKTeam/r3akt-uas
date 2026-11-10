@@ -14,6 +14,8 @@ pub mod dji;
 #[cfg(feature = "publish")]
 pub mod identity;
 #[cfg(feature = "publish")]
+pub mod markers;
+#[cfg(feature = "publish")]
 pub mod publish;
 pub mod sim;
 pub mod telemetry;

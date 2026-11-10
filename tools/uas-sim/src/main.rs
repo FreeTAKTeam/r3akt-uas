@@ -9,6 +9,8 @@
 //!   flies the orbit at 1 Hz with wall-clock fix times and publishes it to RCH;
 //!   `--resend-at N` re-sends the last fix's exact bytes once after N seconds;
 //!   `--team UID` sends the shared object message with that RCH team (step 2b).
+//!   `--mark-at N`, `--move-at N`, `--delete-at N` place, move and delete one hostile
+//!   operator marker at the aircraft position at those seconds (operator markers).
 //!   Prints the publisher status as one JSON line per second.
 
 use std::fmt::Write as _;
@@ -105,12 +107,16 @@ fn publish(args: &[String]) -> Result<(), String> {
         .next()
         .ok_or("--publish needs the hub destination hash")?;
     let (mut store, mut seconds, mut resend_at, mut team) = (None, 60_u32, None, None);
+    let (mut mark_at, mut move_at, mut delete_at) = (None, None, None);
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let mut value = || it.next().ok_or(format!("{arg} needs a value"));
         match arg.as_str() {
             "--store" => store = Some(value()?.clone()),
             "--team" => team = Some(value()?.clone()),
+            "--mark-at" => mark_at = value()?.parse::<u32>().ok(),
+            "--move-at" => move_at = value()?.parse::<u32>().ok(),
+            "--delete-at" => delete_at = value()?.parse::<u32>().ok(),
             "--seconds" => seconds = value()?.parse().map_err(|_| "--seconds needs a number")?,
             "--resend-at" => {
                 resend_at = Some(
@@ -136,6 +142,7 @@ fn publish(args: &[String]) -> Result<(), String> {
             ..sim::sample(seq)
         };
         p::publish_offer_fix(sample);
+        marker_step(seq, mark_at, move_at, delete_at);
         if resend_at == Some(seq) {
             p::publish_resend_last_fix();
         }
@@ -148,12 +155,33 @@ fn publish(args: &[String]) -> Result<(), String> {
 }
 
 #[cfg(feature = "publish")]
+fn marker_step(seq: u32, mark_at: Option<u32>, move_at: Option<u32>, delete_at: Option<u32>) {
+    use r3akt_uas_app::markers as m;
+    let mine = || m::marker_list().into_iter().next().map(|o| o.object_id);
+    let result = if mark_at == Some(seq) {
+        m::marker_create("UAS Alpha-1", m::Affiliation::Hostile).map(|o| format!("created {o:?}"))
+    } else if move_at == Some(seq) {
+        mine().map_or(Ok("no marker".into()), |id| {
+            m::marker_move(&id).map(|o| format!("moved {o:?}"))
+        })
+    } else if delete_at == Some(seq) {
+        mine().map_or(Ok("no marker".into()), |id| {
+            m::marker_delete(&id).map(|()| format!("deleted {id}"))
+        })
+    } else {
+        return;
+    };
+    eprintln!("marker: {}", result.unwrap_or_else(|e| e.to_string()));
+}
+
+#[cfg(feature = "publish")]
 fn status_json(s: &r3akt_uas_app::publish::PublishStatus) -> Value {
     json!({
         "state": format!("{:?}", s.state),
         "destination_hash": s.destination_hash,
         "object_id": s.object_id,
         "team_uid": s.team_uid,
+        "markers_pending": s.markers_pending,
         "hub_connected": s.hub_connected,
         "create_sent": s.create_sent,
         "fixes_sent": s.fixes_sent,

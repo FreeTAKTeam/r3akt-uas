@@ -20,6 +20,10 @@ lxmf-sdk = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a
 lxmf-runtime = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }
 reticulum-rs-transport = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }
 reticulum-rs-core = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }
+# Operator markers (D-12): store types of the LXMF-rs custody outbox.
+lxmf-propagation = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1", features = ["embedded"] }
+# Local list of own markers in the shared map-core marker store (its Connection type).
+rusqlite = "0.41"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 base64 = "0.22"
 rand_core = { version = "0.6.4", features = ["getrandom"] }

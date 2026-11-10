@@ -5,7 +5,6 @@ import android.app.Application
 import android.os.Bundle
 import org.r3akt.uas.bridge.PublishState
 import org.r3akt.uas.bridge.publishOfferFix
-import org.r3akt.uas.bridge.publishResendLastFix
 import org.r3akt.uas.bridge.publishStart
 import org.r3akt.uas.bridge.publishStatus
 import org.r3akt.uas.bridge.publishStop
@@ -48,9 +47,10 @@ class PublishingSimulator : SimulatorSource() {
         })
     }
 
-    // Leaving the cockpit stops publishing, so while running the button replays the last fix (replay check).
-    override fun logAction(): Pair<String, () -> Unit> =
-        if (publishing) "RESEND LAST FIX" to { publishResendLastFix() } else "START PUBLISH" to ::startPublishing
+    // Leaving the cockpit stops publishing; while it runs, the button opens the operator-marker panel.
+    override fun logAction(): Pair<String, (Activity) -> Unit> =
+        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, worker).show() }
+        else "START PUBLISH" to { _ -> startPublishing() }
 
     private fun startPublishing() {
         publishing = true
@@ -89,6 +89,7 @@ class PublishingSimulator : SimulatorSource() {
             appendLine("team ${s.teamUid ?: "none (field 13 only)"}")
             appendLine("state ${s.state.name}${if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""}")
             appendLine("hub connected ${s.hubConnected}, create sent ${s.createSent}, fixes sent ${s.fixesSent}")
+            appendLine("operator markers waiting for the hub: ${s.markersPending}")
             val fix = s.lastSentFix
             appendLine(
                 if (fix == null) "last sent fix -"
