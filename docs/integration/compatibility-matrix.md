@@ -11,7 +11,7 @@ SDK-advertised support and physically tested support are separate columns. No ai
 | Android Gradle Plugin / Gradle | 8.7.2 / 8.11.1 | builds |
 | Kotlin | 1.9.24 | builds |
 | NDK | 27.0.12077973 | builds |
-| Rust | 1.88.0, edition 2024 | builds, tests pass |
+| Rust | 1.89.0, edition 2024 (1.88.0 until milestone 2b re-pin) | builds, tests pass |
 | ABIs | arm64-v8a, x86_64 (Rust); DJI SDK 4.18 provides arm64-v8a, armeabi-v7a, x86 | sim: both ABIs; dji4: arm64-v8a only at runtime (G-10) |
 | DJI Mobile SDK | 4.18 (`com.dji:dji-sdk`, `dji-sdk-provided`) | loads and runs its registration call on a Pixel 7 (Android 17, target SDK 35); never registered with a valid key |
 

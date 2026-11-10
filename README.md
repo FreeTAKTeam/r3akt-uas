@@ -6,14 +6,14 @@ An independent Android DJI flying application for the R3AKT ecosystem: existing 
 
 What the scaffold does:
 
-- `crates/r3akt-uas-app`: thin Rust integration. Encodes and decodes aircraft telemetry with the shared `r3akt-map-core` Telemeter codec (RCH `c2bf78a`) and provides a deterministic simulated aircraft.
+- `crates/r3akt-uas-app`: thin Rust integration. Encodes and decodes aircraft telemetry with the shared `r3akt-map-core` Telemeter codec (RCH `f5822210`) and provides a deterministic simulated aircraft.
 - `apps/android`: Kotlin app `org.r3akt.uas` with a `sim` variant (no DJI SDK, no credentials) and a `dji4` variant (DJI SDK 4.18; registers and connects only when built with a `djiApiKey`; untested with an aircraft). Kotlin calls Rust through UniFFI-generated bindings.
 - `tools/uas-sim`: writes and checks the telemetry fixtures in `fixtures/telemetry/`.
 - Nothing connects to hardware or a network by default.
 
 ## Build
 
-Requires Rust 1.88.0 (from `rust-toolchain.toml`), JDK 17+, Android SDK 35 and NDK 27.0.12077973 (`ANDROID_HOME` or `~/Android/Sdk`).
+Requires Rust 1.89.0 (from `rust-toolchain.toml`), JDK 17+, Android SDK 35 and NDK 27.0.12077973 (`ANDROID_HOME` or `~/Android/Sdk`).
 
 ```bash
 scripts/check.sh

@@ -377,10 +377,9 @@ fn run(
 
         if std::mem::take(&mut resend)
             && let Some(bytes) = &last_sent
+            && let Err(error) = send(bytes)
         {
-            if let Err(error) = send(bytes) {
-                update(|s| s.last_error = Some(format!("replay not sent: {error}")));
-            }
+            update(|s| s.last_error = Some(format!("replay not sent: {error}")));
         }
         if let Some(sample) = slot.take() {
             match fix_message(&identity, &sample) {
