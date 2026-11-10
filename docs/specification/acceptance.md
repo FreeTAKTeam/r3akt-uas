@@ -42,7 +42,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRD-007 | 5 | TCP and RNode operation evidence | specified |
 | UAS-PRD-008 | 5 | Detection promotion evidence | specified |
 | UAS-PRD-009 | 5 | MediaMTX playback evidence | specified |
-| UAS-PRD-010 | 5 | Offline/mesh evidence | specified |
+| UAS-PRD-010 | 3, 5 | Offline/mesh evidence (operator markers through the LXMF-rs custody outbox in milestone 3; constrained mesh in 5) | specified |
 | UAS-PRD-011 | 1, 6 | EPL-2.0 `LICENSE`, `THIRD_PARTY_NOTICES.md` (1); signed APK (6) | scaffold-proven (licensing); signing specified |
 | UAS-PRD-012 | 2, 4 | No flight command path in RCH integration; review + tests | proven in scope (step 2a: the publisher has no receive path, G-17; POST review) |
 | UAS-ARC-001 | 1–5 | Architecture review at each milestone gate | specified |
