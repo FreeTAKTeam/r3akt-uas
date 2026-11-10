@@ -20,7 +20,8 @@ object Variant {
 
 /**
  * Test build only (D-4): the simulator, published to the RCH hub named by the Gradle
- * properties `r3aktHubAddress` and `r3aktHubDestination`. Publishing starts on the operator's
+ * properties `r3aktHubAddress` and `r3aktHubDestination`, optionally in the RCH team `r3aktTeamUid`
+ * (then the hub relays the aircraft to that team's REM clients). Publishing starts on the operator's
  * tap in the session log and stops whenever the cockpit leaves the foreground; while it runs,
  * the same button re-sends the last fix.
  * The app reports "sent", never "accepted": it cannot read the hub's results (G-17).
@@ -55,7 +56,7 @@ class PublishingSimulator : SimulatorSource() {
         publishing = true
         worker.execute {
             startError = runCatching {
-                publishStart(storeDir, BuildConfig.HUB_ADDRESS, BuildConfig.HUB_DESTINATION, null)
+                publishStart(storeDir, BuildConfig.HUB_ADDRESS, BuildConfig.HUB_DESTINATION, BuildConfig.TEAM_UID.ifEmpty { null })
             }.exceptionOrNull()?.let { it.message ?: it.toString() }
             if (startError != null) publishing = false
         }

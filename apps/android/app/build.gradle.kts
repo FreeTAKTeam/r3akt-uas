@@ -28,6 +28,8 @@ android {
             val hub = { name: String -> "\"" + providers.gradleProperty(name).getOrElse("") + "\"" }
             buildConfigField("String", "HUB_ADDRESS", hub("r3aktHubAddress"))
             buildConfigField("String", "HUB_DESTINATION", hub("r3aktHubDestination"))
+            // Optional RCH team UID (field 11): with it the hub relays the aircraft to that team's REM clients.
+            buildConfigField("String", "TEAM_UID", hub("r3aktTeamUid"))
         }
         create("dji4") {
             dimension = "aircraft"
