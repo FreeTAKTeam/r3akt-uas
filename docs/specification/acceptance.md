@@ -38,7 +38,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRD-003 | 4, 6 | Compatibility matrix with physically tested rows | specified |
 | UAS-PRD-004 | 4 | Hardware flight evidence per action | implemented but unproven (take-off, landing, RTH, photo, video preview); recording and gimbal control specified |
 | UAS-PRD-005 | 4 | Radar evidence (see Radar) | specified |
-| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | proven in scope (step 2a: RCH store and API, [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence; the map view is blocked by G-20); REM specified |
+| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | proven in scope (step 2a: RCH store and API, [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence; the map view at `c2bf78a` is blocked by G-20 and shown against RCH `cc6ca164`, [map evidence](../evidence/m2a-rch-map-cc6ca164.md)); REM specified |
 | UAS-PRD-007 | 5 | TCP and RNode operation evidence | specified |
 | UAS-PRD-008 | 5 | Detection promotion evidence | specified |
 | UAS-PRD-009 | 5 | MediaMTX playback evidence | specified |
@@ -120,7 +120,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 
 ## Milestone 2a evidence record (10 November 2026)
 
-Step 2a's evidence is captured; the milestone awaits owner acceptance. A simulated aircraft, from the host tool and from the `simNet` test build on a Pixel 7, reaches RCH `c2bf78a` through the shared LXMF-rs `888355c` runtime as one `mission.marker.create` (field 9) and R3S origin fixes (field 13). Each identity keeps exactly one marker and one origin after restarts, a force-stop and replayed fixes, and the origin follows the orbit: [host proof](../evidence/m2a-task5-hub-host-proof.md), [device proof](../evidence/m2a-task6-device-proof.md), POST review in [pre-review.md](../integration/pre-review.md). The RCH map view itself cannot show it at `c2bf78a` (G-20, RCH #305); REM is step 2b.
+Step 2a's evidence is captured; the milestone awaits owner acceptance. A simulated aircraft, from the host tool and from the `simNet` test build on a Pixel 7, reaches RCH `c2bf78a` through the shared LXMF-rs `888355c` runtime as one `mission.marker.create` (field 9) and R3S origin fixes (field 13). Each identity keeps exactly one marker and one origin after restarts, a force-stop and replayed fixes, and the origin follows the orbit: [host proof](../evidence/m2a-task5-hub-host-proof.md), [device proof](../evidence/m2a-task6-device-proof.md), POST review in [pre-review.md](../integration/pre-review.md). The RCH map view cannot show it at `c2bf78a` (G-20, RCH #305); against RCH `cc6ca164`, where #305 is fixed, the unchanged app's marker is drawn and moves on the map ([map evidence](../evidence/m2a-rch-map-cc6ca164.md)). REM is step 2b.
 
 ## Milestone 4 evidence record (10 November 2026, partial)
 

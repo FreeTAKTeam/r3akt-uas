@@ -148,6 +148,8 @@ Same hub, store and object (hub restarted, default `config.ini` from above):
 
 ## RCH map screenshot: not obtainable at `c2bf78a` (G-20)
 
+Update: RCH fixed #305 in `cc6ca164`; the map view against that hub is recorded in [m2a-rch-map-cc6ca164.md](m2a-rch-map-cc6ca164.md).
+
 ![RCH webmap centred on 45°N 7°E with no marker drawn](m2a-rch-webmap-marker-hidden-g20.png)
 
 The webmap draws no marker here, although `/api/markers` returns it at 44.998 N, 7.000 E. At `c2bf78a` `r3akt-map-core::marker::MarkerRecord::api_value` sets `stale_at` equal to `updated_at`, and the UI drops every marker whose `stale_at` is in the past (`ui/src/stores/markers.ts` `expired`, `WebMapPage.vue` feature filter). Every marker is therefore hidden about a second after its last update, whoever created it. This is recorded as gap G-20 and reported as [RCH #305](https://github.com/FreeTAKTeam/Reticulum-Community-Hub/issues/305); the task-5 map evidence above is the store and API output instead. The screenshot was taken with headless Chromium (software WebGL) because the app's browser pane has no WebGL.
