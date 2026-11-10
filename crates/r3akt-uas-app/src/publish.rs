@@ -457,7 +457,7 @@ fn run(
                     reply,
                 }) => {
                     let result =
-                        deposit_marker(&runtime, &outbox, &source_hex, hub, change, &record);
+                        deposit_marker(&runtime, &outbox, &source_hex, hub, team, change, &record);
                     update_pending(&outbox);
                     let _ = reply.send(result);
                 }
@@ -544,10 +544,11 @@ fn deposit_marker(
     outbox: &LocalPropagation,
     source: &str,
     hub: &str,
+    team: Option<&str>,
     change: Change,
     record: &MarkerRecord,
 ) -> Result<(), String> {
-    let fields = markers::message(change, record, source, now_s().saturating_mul(1000))?;
+    let fields = markers::message(change, record, source, team, now_s().saturating_mul(1000))?;
     let prepared = runtime
         .block_on(outbox.prepare(&fields_request(source, hub, &fields)))
         .map_err(|e| format!("{e} (the hub must have been reached once)"))?;

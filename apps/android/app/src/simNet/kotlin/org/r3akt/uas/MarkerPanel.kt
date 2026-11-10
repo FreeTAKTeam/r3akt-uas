@@ -16,6 +16,7 @@ import org.r3akt.uas.bridge.markerDelete
 import org.r3akt.uas.bridge.markerList
 import org.r3akt.uas.bridge.markerMove
 import org.r3akt.uas.bridge.publishResendLastFix
+import org.r3akt.uas.bridge.publishStatus
 import java.util.concurrent.Executor
 
 /**
@@ -33,6 +34,7 @@ class MarkerPanel(private val activity: Activity, private val worker: Executor) 
         "Uniform", "Victor", "Whiskey", "X-ray", "Yankee", "Zulu",
     )
     private lateinit var listView: LinearLayout
+    private lateinit var header: TextView
     private var dialog: AlertDialog? = null
 
     fun show() {
@@ -46,7 +48,8 @@ class MarkerPanel(private val activity: Activity, private val worker: Executor) 
         listView = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         val markers = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            addView(TextView(activity).apply { text = "This app's markers (last sent state)" })
+            header = TextView(activity)
+            addView(header)
             addView(ScrollView(activity).apply { addView(listView) })
         }
         // Side by side: the cockpit is landscape, so a stacked list would fall off the dialog.
@@ -91,10 +94,13 @@ class MarkerPanel(private val activity: Activity, private val worker: Executor) 
 
     private fun refresh() = worker.execute {
         val markers = runCatching { markerList() }.getOrDefault(emptyList())
-        activity.runOnUiThread { showList(markers) }
+        val pending = runCatching { publishStatus().markersPending.toString() }.getOrDefault("?")
+        activity.runOnUiThread { showList(markers, pending) }
     }
 
-    private fun showList(markers: List<OwnMarker>) {
+    private fun showList(markers: List<OwnMarker>, pending: String) {
+        // Stored is not sent: the outbox may still hold the latest change (UAS-PRD-010).
+        header.text = "This app's markers (last change made here)\n$pending change(s) stored, waiting for the hub"
         listView.removeAllViews()
         if (markers.isEmpty()) listView.addView(TextView(activity).apply { text = "none" })
         for (m in markers) {

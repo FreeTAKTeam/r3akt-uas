@@ -8,7 +8,7 @@
 use std::path::Path;
 
 use r3akt_map_core::{MarkerDraft, MarkerRecord, Position, marker};
-use r3akt_profile_rch::{MissionCommandEnvelope, RchSource, encode_commands};
+use r3akt_profile_rch::{MissionCommandEnvelope, RchSource, encode_commands_for_team};
 use rand_core::{OsRng, RngCore};
 
 /// NATO affiliation; each is a map-core catalog symbol (D-11).
@@ -98,12 +98,14 @@ pub(crate) fn position_note(simulated: bool) -> String {
     )
 }
 
-/// The fields map for one change: a mission command on field 9, encoded by the shared encoder.
+/// The fields map for one change: a mission command on field 9 and, with a team, field 11,
+/// both written by the shared encoder; RCH relays the result to that team's REM clients.
 /// One fixed `command_id` per stored message, so a re-sent copy is the same command.
 pub(crate) fn message(
     change: Change,
     record: &MarkerRecord,
     source: &str,
+    team: Option<&str>,
     now_ms: i64,
 ) -> Result<Vec<u8>, String> {
     let id = &record.object_destination_hash;
@@ -128,17 +130,18 @@ pub(crate) fn message(
             serde_json::json!({"object_destination_hash": id}),
         ),
     };
-    // shortcut: field 9 only, so markers reach RCH but not REM; switch to the team-scoped
-    // shared encoder when RCH #315 is pinned (D-13). Field 11 is never written by hand here.
-    encode_commands(&[MissionCommandEnvelope {
-        command_id,
-        source: RchSource::new(source),
-        timestamp: r3akt_map_core::time::iso8601_from_unix_ms(now_ms),
-        command_type: command_type.to_owned(),
-        args,
-        correlation_id: None,
-        topics: Vec::new(),
-    }])
+    encode_commands_for_team(
+        &[MissionCommandEnvelope {
+            command_id,
+            source: RchSource::new(source),
+            timestamp: r3akt_map_core::time::iso8601_from_unix_ms(now_ms),
+            command_type: command_type.to_owned(),
+            args,
+            correlation_id: None,
+            topics: Vec::new(),
+        }],
+        team,
+    )
     .map_err(|e| e.to_string())
 }
 
@@ -294,13 +297,17 @@ mod tests {
             (Change::Move, "mission.marker.position.patch"),
             (Change::Delete, "mission.marker.delete"),
         ] {
+            let team = Some("43341e5c822d99857fa6e8641f2ca9c0");
             let bytes = message(
                 change,
                 &rec,
                 "4d8ffce8db31d5f2a063a7906f46d191",
+                team,
                 1_800_000_000_000,
             )
             .unwrap();
+            let fields = r3akt_map_core::msgpack::to_json(&bytes).unwrap();
+            assert_eq!(fields.get("11").and_then(|t| t.as_str()), team);
             let commands = decode_commands(&bytes).unwrap();
             assert_eq!(commands.len(), 1);
             assert_eq!(commands[0].command_type, ty);
@@ -310,8 +317,13 @@ mod tests {
             );
         }
         // The create is the same command when rebuilt: its id is fixed per marker.
-        let a = decode_commands(&message(Change::Create, &rec, "s", 1).unwrap()).unwrap();
-        let b = decode_commands(&message(Change::Create, &rec, "s", 2).unwrap()).unwrap();
+        let a = decode_commands(&message(Change::Create, &rec, "s", None, 1).unwrap()).unwrap();
+        let b = decode_commands(&message(Change::Create, &rec, "s", None, 2).unwrap()).unwrap();
+        // Without a team only field 9 is written (RCH only, no REM relay).
+        let keys =
+            r3akt_map_core::msgpack::to_json(&message(Change::Delete, &rec, "s", None, 1).unwrap())
+                .unwrap();
+        assert_eq!(keys.as_object().unwrap().keys().collect::<Vec<_>>(), ["9"]);
         assert_eq!(a[0].command_id, b[0].command_id);
     }
 
