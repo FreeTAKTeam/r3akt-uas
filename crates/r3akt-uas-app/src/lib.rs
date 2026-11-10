@@ -8,6 +8,8 @@
 #![allow(unsafe_code)] // Only UniFFI's generated scaffolding; hand-written code stays safe.
 uniffi::setup_scaffolding!();
 
+#[cfg(feature = "publish")]
+pub mod aircraft;
 pub mod dji;
 #[cfg(feature = "publish")]
 pub mod identity;
