@@ -12,14 +12,14 @@ use std::time::Duration;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use lxmf_runtime::{
-    EXT_FIELDS_BASE64, EXT_RAW_BYTES_BASE64, InProcessBackend, InProcessBackendConfig,
+    EXT_FIELDS_BASE64, EXT_LINK_CONNECT_TIMEOUT_MS, EXT_RAW_BYTES_BASE64, InProcessBackend,
+    InProcessBackendConfig,
 };
 use lxmf_sdk::{SdkBackend, SendRequest};
 use r3akt_map_core::sensor::{AltitudeDatum, OriginPosition};
 use r3akt_map_core::sensor_wire::{OriginFixEvent, SensorEvent};
 use r3akt_profile_rch::{EventEnvelope, RchSource, encode_events};
 use rns_transport::destination::{DestinationName, SingleInputDestination};
-use rns_transport::hash::AddressHash;
 use rns_transport::identity::PrivateIdentity;
 use rns_transport::iface::tcp_client::{TcpClient, TcpRuntimeStatusHandle};
 use rns_transport::iface::{IfaceRole, InterfaceMode};
@@ -126,6 +126,9 @@ struct Worker {
     thread: std::thread::JoinHandle<()>,
 }
 
+/// Longest wait for the hub's path per send, bounding how long a stop can take.
+pub const SEND_PATH_TIMEOUT_MS: u64 = 5_000;
+
 static WORKER: Mutex<Option<Worker>> = Mutex::new(None);
 static STATUS: Mutex<PublishStatus> = Mutex::new(STATUS_STOPPED);
 
@@ -149,9 +152,11 @@ pub fn publish_start(
     hub_destination: &str,
 ) -> Result<(), PublishError> {
     let hub = hub_destination.trim().to_ascii_lowercase();
-    AddressHash::new_from_hex_string(&hub).map_err(|_| PublishError::Config {
-        reason: "hub destination must be 32 hex characters".to_owned(),
-    })?;
+    if hub.len() != 32 || !hub.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(PublishError::Config {
+            reason: "hub destination must be 32 hex characters".to_owned(),
+        });
+    }
     let mut worker = WORKER
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -166,12 +171,19 @@ pub fn publish_start(
     });
     let (tx, rx) = std::sync::mpsc::channel();
     let thread = std::thread::spawn(move || {
-        let result = run(Path::new(&store_dir), &hub_address, &hub, &rx);
-        update(|s| match result {
-            Ok(()) => s.state = PublishState::Stopped,
-            Err(error) => {
-                s.state = PublishState::Failed;
-                s.last_error = Some(error);
+        // A panic in shared code must not leave the status claiming "Sent".
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run(Path::new(&store_dir), &hub_address, &hub, &rx)
+        }))
+        .unwrap_or_else(|_| Err("publisher worker panicked".to_owned()));
+        update(|s| {
+            s.hub_connected = false;
+            match result {
+                Ok(()) => s.state = PublishState::Stopped,
+                Err(error) => {
+                    s.state = PublishState::Failed;
+                    s.last_error = Some(error);
+                }
             }
         });
     });
@@ -211,7 +223,8 @@ pub fn publish_status() -> PublishStatus {
         .clone()
 }
 
-/// Stops the publisher and waits for its thread to end.
+/// Stops the publisher and waits for its thread to end. It can block for up to
+/// one send's path wait ([`SEND_PATH_TIMEOUT_MS`]); call it off the UI thread.
 #[uniffi::export]
 pub fn publish_stop() {
     let worker = WORKER
@@ -302,24 +315,14 @@ fn run(
         private,
         source,
     ));
-    let send = |fields: &[u8]| -> Result<(), String> {
-        let mut request = SendRequest::new(source_hex.as_str(), hub, serde_json::json!({}));
-        request
-            .extensions
-            .insert(EXT_RAW_BYTES_BASE64.to_owned(), serde_json::json!(""));
-        request.extensions.insert(
-            EXT_FIELDS_BASE64.to_owned(),
-            serde_json::json!(BASE64_STANDARD.encode(fields)),
-        );
-        backend.send(request).map(|_| ()).map_err(|e| e.to_string())
-    };
+    let send = |fields: &[u8]| send_fields(&backend, &source_hex, hub, fields);
 
     let mut slot: Option<TelemetrySample> = None;
     let mut resend = false;
     let mut announced = false;
     let mut create: Option<Vec<u8>> = None;
     let mut created = false;
-    let mut last_sent: Option<(TelemetrySample, Vec<u8>)> = None;
+    let mut last_sent: Option<Vec<u8>> = None;
     loop {
         // Drain every pending command; only the newest fix survives.
         let mut next = rx.recv_timeout(Duration::from_secs(1));
@@ -340,7 +343,10 @@ fn run(
         let connected = tcp.to_json()["stream_state"].as_str() == Some("connected");
         update(|s| s.hub_connected = connected);
         if !connected {
+            // The create is fire-and-forget; re-send its stored bytes on the next
+            // connection (the hub de-duplicates them by command_id).
             announced = false;
+            created = false;
             continue;
         }
         if !announced {
@@ -358,6 +364,9 @@ fn run(
                 Ok(()) => {
                     created = true;
                     update(|s| s.create_sent = true);
+                    // Packets can arrive reordered and the hub skips a fix that precedes
+                    // its create, so the first fix waits for the next pass (1 s).
+                    continue;
                 }
                 Err(error) => {
                     update(|s| s.last_error = Some(format!("create not sent: {error}")));
@@ -367,16 +376,18 @@ fn run(
         }
 
         if std::mem::take(&mut resend)
-            && let Some((sample, bytes)) = &last_sent
+            && let Some(bytes) = &last_sent
         {
-            record_send(send(bytes), sample);
+            if let Err(error) = send(bytes) {
+                update(|s| s.last_error = Some(format!("replay not sent: {error}")));
+            }
         }
         if let Some(sample) = slot.take() {
             match fix_message(&identity, &sample) {
                 Err(error) => update(|s| s.last_error = Some(error.to_string())),
                 Ok(bytes) => {
                     if record_send(send(&bytes), &sample) {
-                        last_sent = Some((sample, bytes));
+                        last_sent = Some(bytes);
                     } else {
                         slot = Some(sample); // retried unless a newer fix replaces it
                     }
@@ -384,6 +395,27 @@ fn run(
             }
         }
     }
+}
+
+/// One fields-only LXMF message to the hub through the shared in-process backend.
+fn send_fields(
+    backend: &InProcessBackend,
+    source: &str,
+    hub: &str,
+    fields: &[u8],
+) -> Result<(), String> {
+    let mut request = SendRequest::new(source, hub, serde_json::json!({}));
+    let ext = &mut request.extensions;
+    ext.insert(EXT_RAW_BYTES_BASE64.to_owned(), serde_json::json!(""));
+    ext.insert(
+        EXT_LINK_CONNECT_TIMEOUT_MS.to_owned(),
+        serde_json::json!(SEND_PATH_TIMEOUT_MS),
+    );
+    ext.insert(
+        EXT_FIELDS_BASE64.to_owned(),
+        serde_json::json!(BASE64_STANDARD.encode(fields)),
+    );
+    backend.send(request).map(|_| ()).map_err(|e| e.to_string())
 }
 
 fn record_send(result: Result<(), String>, sample: &TelemetrySample) -> bool {
