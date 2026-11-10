@@ -1,0 +1,14 @@
+//! Thin R3AKT UAS application integration.
+//!
+//! This crate normalizes aircraft values at the DJI/simulator boundary and calls
+//! the shared R3AKT libraries for every wire format. It must not grow its own
+//! Reticulum stack, LXMF envelope, telemetry codec, routing policy or delivery
+//! queue (see `AGENTS.md` and `docs/specification/architecture.md`).
+
+#![allow(unsafe_code)] // Only UniFFI's generated scaffolding; hand-written code stays safe.
+uniffi::setup_scaffolding!();
+
+pub mod sim;
+pub mod telemetry;
+
+pub use telemetry::{AltitudeReference, DecodedTelemetry, TelemetrySample, UasError};
