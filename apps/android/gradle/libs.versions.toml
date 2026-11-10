@@ -1,0 +1,26 @@
+# Initial baseline from the inspected REM Android toolchain (PLAN.md section 4).
+# These still require qualification with the DJI SDK 4 / native dependency set.
+[versions]
+agp = "8.7.2"
+kotlin = "1.9.24"
+compileSdk = "35"
+targetSdk = "35"
+minSdk = "26"
+ndk = "27.0.12077973"
+jna = "5.14.0"
+djiSdk = "4.18"
+appcompat = "1.6.1"
+constraintlayout = "2.1.4"
+
+[libraries]
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+dji-sdk = { module = "com.dji:dji-sdk", version.ref = "djiSdk" }
+# DJI SDK 4 resources reference these without declaring them.
+appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+dji-sdk-provided = { module = "com.dji:dji-sdk-provided", version.ref = "djiSdk" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

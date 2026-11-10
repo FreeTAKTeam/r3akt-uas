@@ -1,0 +1,27 @@
+[package]
+name = "r3akt-uas-app"
+version = "0.1.0"
+description = "Thin R3AKT UAS application integration over the shared R3AKT libraries"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+r3akt-map-core.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uniffi.workspace = true
+
+# Workspace lints forbid unsafe code; UniFFI's generated FFI scaffolding needs it,
+# so this crate denies it instead and the scaffolding macro allows it locally.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

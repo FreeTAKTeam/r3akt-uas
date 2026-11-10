@@ -1,0 +1,29 @@
+# Example MediaMTX configuration for R3AKT UAS video (UAS-VID-001). No credentials:
+# add users through MediaMTX authentication (internal users, or HTTP/JWT backed
+# by RCH authorization) in the deployment, never in this file.
+# Default deny: only the local API is reachable until the deployment adds
+# authorization (MediaMTX's built-in default would let anyone publish and read).
+authInternalUsers:
+  - user: any
+    pass:
+    ips: ["127.0.0.1", "::1"]
+    permissions:
+      - action: api
+
+rtmp: yes
+rtmpAddress: :1935
+webrtc: yes
+webrtcAddress: :8889
+hls: yes
+hlsAddress: :8888
+rtsp: yes
+rtspAddress: :8554
+
+pathDefaults:
+  record: yes
+  recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+
+paths:
+  # One path per aircraft stream, e.g. uas/<aircraft-object-id>.
+  "~^uas/.+$":
+    source: publisher

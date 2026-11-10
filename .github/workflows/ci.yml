@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-docs-boundaries:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - run: scripts/check.sh
+
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install NDK and platform
+        run: sdkmanager "ndk;27.0.12077973" "platforms;android-35" "build-tools;35.0.0"
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Build simulator and DJI 4 variants
+        working-directory: apps/android
+        run: ./gradlew --no-daemon :app:assembleSimDebug :app:assembleDji4Debug
+      - name: Simulator APK must not contain the DJI SDK
+        run: |
+          set -euo pipefail
+          apk=apps/android/app/build/outputs/apk/sim/debug/app-sim-debug.apk
+          test -f "$apk"
+          ! unzip -l "$apk" | grep -i dji

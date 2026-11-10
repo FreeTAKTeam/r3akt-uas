@@ -1,0 +1,25 @@
+[workspace]
+members = ["crates/r3akt-uas-app", "tools/uas-sim", "tools/uniffi-bindgen"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.88"
+license = "EPL-2.0"
+repository = "https://github.com/FreeTAKTeam/r3akt-uas"
+publish = false
+
+# Shared R3AKT libraries, pinned to the inspected baselines in docs/goals/bootstrap/PLAN.md.
+# Do not replace these with local implementations (see AGENTS.md).
+[workspace.dependencies]
+r3akt-map-core = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0" }
+serde_json = "1.0"
+thiserror = "2.0"
+uniffi = "=0.28.3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

@@ -1,0 +1,15 @@
+[package]
+name = "uas-sim"
+version = "0.1.0"
+description = "Deterministic simulated aircraft telemetry through the shared R3AKT codecs"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+r3akt-uas-app = { path = "../../crates/r3akt-uas-app" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

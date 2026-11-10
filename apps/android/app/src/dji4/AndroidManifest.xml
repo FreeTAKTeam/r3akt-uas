@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Supplied from the djiApiKey Gradle property; empty by default. -->
+        <meta-data android:name="com.dji.sdk.API_KEY" android:value="${djiApiKey}" />
+    </application>
+</manifest>

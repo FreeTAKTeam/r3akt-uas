@@ -1,14 +1,37 @@
 # R3AKT UAS
 
-An independent Android DJI flying application planned for the R3AKT ecosystem: existing Reticulum/LXMF libraries, RCH telemetry and mission services, REM-compatible markers, aircraft-centred radar, and separate MediaMTX video.
+An independent Android DJI flying application for the R3AKT ecosystem: existing Reticulum/LXMF libraries, RCH telemetry and mission services, REM-compatible markers, aircraft-centred radar, and separate MediaMTX video.
 
-**Status: planning.** This repository currently contains the agreed plan and implementation handoff. The application and target scaffold have not been implemented.
+**Status: specification and scaffold (milestone 1).** The specification package and a buildable skeleton exist. No product feature is implemented: there is no flight control, radar, network publication or video yet. See [acceptance.md](docs/specification/acceptance.md) for what is proven and what is not.
 
-- [Specification and repository structure plan](docs/goals/bootstrap/PLAN.md)
-- [Implementation handoff](docs/goals/bootstrap/GOAL.md)
+What the scaffold does:
 
-The agreed baseline is native Android with a thin Rust integration layer, DJI SDK 4, core local flight controls, TCP/IP and RNode connectivity, signed APK releases, and EPL-2.0 for original implementation code with upstream notices retained.
+- `crates/r3akt-uas-app`: thin Rust integration. Encodes and decodes aircraft telemetry with the shared `r3akt-map-core` Telemeter codec (RCH `c2bf78a`) and provides a deterministic simulated aircraft.
+- `apps/android`: Kotlin app `org.r3akt.uas` with a `sim` variant (no DJI SDK, no credentials) and a `dji4` variant (DJI SDK 4.18 linked, never registered). Kotlin calls Rust through UniFFI-generated bindings.
+- `tools/uas-sim`: writes and checks the telemetry fixtures in `fixtures/telemetry/`.
+- Nothing connects to hardware or a network by default.
 
-Existing shared Rust libraries own networking, wire formats, delivery policy, telemetry codecs, and map/sensor models. This project must reuse them rather than introduce parallel implementations.
+## Build
 
-See the plan for scope, reference baselines, required companion changes, milestones, and acceptance evidence.
+Requires Rust 1.88.0 (from `rust-toolchain.toml`), JDK 17+, Android SDK 35 and NDK 27.0.12077973 (`ANDROID_HOME` or `~/Android/Sdk`).
+
+```bash
+scripts/check.sh
+```
+
+```bash
+cd apps/android && ./gradlew :app:assembleSimDebug
+```
+
+The `dji4` variant (`:app:assembleDji4Debug`) needs a `djiApiKey` Gradle property only when you register with DJI; keep it in `~/.gradle/gradle.properties`.
+
+## Documents
+
+- Plan and handoff: [PLAN.md](docs/goals/bootstrap/PLAN.md), [GOAL.md](docs/goals/bootstrap/GOAL.md)
+- Specification: [product](docs/specification/product.md), [architecture](docs/specification/architecture.md), [UAS profile v1](docs/specification/uas-profile-v1.md), [flight and radar](docs/specification/flight-and-radar.md), [video and offline](docs/specification/video-and-offline.md), [acceptance](docs/specification/acceptance.md)
+- Integration: [existing system and gaps](docs/integration/existing-system-and-gaps.md), [reuse matrix](docs/integration/reuse-matrix.md), [RCH/REM changes](docs/integration/rch-rem-changes.md), [compatibility matrix](docs/integration/compatibility-matrix.md), [PRE review](docs/integration/pre-review.md)
+- Decisions: [ADRs](docs/adr/README.md); repository rules: [AGENTS.md](AGENTS.md)
+
+Additions to the planned tree: `tools/uniffi-bindgen` (pinned binding generator) and `docs/evidence/` (captured acceptance evidence).
+
+Original code is EPL-2.0 ([LICENSE](LICENSE)); third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
