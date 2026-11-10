@@ -101,8 +101,23 @@ Two fresh reviewers read [the step 2b plan](../goals/m2-vertical-slice/PLAN-2b.m
 | R5 | major | Hub and REM setup steps, operator, REM device and address were not named. | yes (`rem_team_directory.rs:45-52, 201-214`) | Task 0 names revisions, emulator address, operator and the exact calls. |
 | R6–R16, B3–B6, B8–B10 | minor | Upper-case team UIDs relay to nobody; `publish_start` signature change breaks simNet between tasks; incomplete task 1 file list (README, compatibility matrix); profile carrier table lacks field 11; mixed REM LXMF-rs revision; REM restart limit; UAS-PRF-008 belongs to the REM proof; further owner decisions; spike claims unrecorded; take-off-relative and unknown altitude cases; device clock behind the stored fix; LXMF-rs APIs unchanged (no action); Rust 1.89 compatible; no wire code forced here. | mostly | All applied as plan text (D-7 to D-9, file lists, tests, known limits). |
 
+## POST: milestone 2b tasks 0 to 3 (10 November 2026)
+
+A fresh reviewer read commits `eaddade` to `e16d135`, the evidence and the pinned shared sources, and ran the feature tests and clippy. Verdict: **partially aligned, no blocker.** No kill criterion is hit: fields 3, 11 and 13 come only from `encode_object_fields`, the no-team path is the 2a code unchanged, there is no receive path, the publisher stays behind `publish`/`simNet`, there is one marker and one origin per identity, and REM evidence is described as appearance only.
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| P1 | major | "No relay dispatch was rejected" was argued from daemon receipts; RCH records rejections in its own broker store. | Checked in both hub databases: every dispatch `terminal`/`delivered`, no `rejected` message record, and distinct fixes = relays per object (86, 18; spike 118). Evidence amended; the spike's mid-run "95/1" figure corrected. |
+| P2 | major | REM after the force-stop and relaunch, and after the 2a-store run, were text only. | Screenshots added (Markers 1 at 4:15, Markers 2 at 4:21). |
+| P3 | minor | "Same moment" was loose. | Reworded: hub origin at the end of run 2. |
+| P4 | minor | D-7 was narrowed to a 32-hex check after the ruling; the plan row contradicted it and the cost was not listed. | Plan row fixed; known limit added; the owner confirmed the narrowed D-7 and the shared list is requested as RCH #312. |
+| P5 | minor | Task 1 evidence only in the commit message. | `docs/evidence/m2b-task1-repin.md`. |
+| P6 | minor | No byte-equality test for the no-team path. | Plan wording relaxed to "2a code path unchanged (key set {13})"; the path is unchanged by inspection. |
+| P7 | minor | Stale `c2bf78a` references and gate status. | Profile baseline note, R3S contract link, reuse matrix RCH service row, `rch-rem-changes.md` ordering note and this gate status updated. |
+| P8 | minor | Encoder failures on the team path are labelled `Invalid`. | Accepted (label only). |
+
 ## Gate status
 
 - Milestone 1 (specification and scaffold): complete. The `ci` workflow builds from a clone on GitHub and passed, and the dji4 variant runs on a Pixel 7 (see the records in [acceptance.md](../specification/acceptance.md)).
 - PRE gate for milestone 2a: **passed on 10 November 2026.** The two blockers of the first focused PRE were ruled on by the owner, the second pass found no blocker, and its corrections are applied in plan revision 3. The POST review of the task 5 hub evidence (above) found no blocker; its corrections are applied and task 6 may start.
-- Milestone 2b (REM): focused PRE on revision 1 found no blocker; revision 2 applies it. Starting needs the owner's rulings D-5 to D-9. Milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE.
+- Milestone 2b (REM): PRE passed; owner rulings D-5 to D-9 taken; tasks 0 to 3 done and the POST review above found no blocker (corrections applied). Task 4 (simNet device proof) may start. Milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE.

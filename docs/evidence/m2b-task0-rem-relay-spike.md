@@ -42,7 +42,7 @@ relays carrying mission.marker.created: 1
 
 - **Relays:** the hub sent REM 118 R3S relays. Only the first carried `mission.marker.created`. After its delivery was confirmed, the hub stored the relay metadata (`r3s_relay_metadata`: one row for the object and REM), and the other 117 carried only the field-3 stream and the origin fix.
 - **Other messages:** the six field-10 messages are hub-directory command results unrelated to the relay. For example, before the team existed one said "REM announce capabilities are required".
-- **Rejected dispatches:** none were seen. The hub's `rch_messages` table shows 95 `delivered` and 1 `sending`, all `accepted`.
+- **Rejected dispatches:** none. Checked in the hub database after the run (corrected after the POST review; an earlier "95 delivered, 1 sending" was a mid-run snapshot): `rch_broker_dispatch` has 128 rows, all `terminal`/`delivered`; `rch_messages` 128 `delivered`, none `rejected`; the publisher sent 118 distinct fixes and the hub made 118 relays.
 
 ## Hub and REM side by side
 

@@ -2,7 +2,7 @@
 
 Status: **specified, not implemented.** Only the Telemeter mapping in table T1 is exercised by the scaffold (`r3akt-uas-app` encode/decode and `fixtures/telemetry/sim-orbit-v1.jsonl`).
 
-Source: [PLAN.md](../goals/bootstrap/PLAN.md), section 3. Existing contracts referenced here are at the RCH baseline `c2bf78a`: the Telemeter codec (`r3akt-map-core` `telemetry`, `telemetry_encode`), the [R3S/1 contract](https://github.com/FreeTAKTeam/Reticulum-Community-Hub/blob/c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0/docs/r3s-telemetry.md) (`r3akt-map-core` `sensor*`), markers (`r3akt-map-core` `marker`), and mission commands/events (`r3akt-profile-rch`).
+Source: [PLAN.md](../goals/bootstrap/PLAN.md), section 3. Existing contracts referenced here are at the RCH baseline `c2bf78a` (pinned at `f5822210` since milestone 2b, which adds `sensor_wire::encode_object_fields`): the Telemeter codec (`r3akt-map-core` `telemetry`, `telemetry_encode`), the [R3S/1 contract](https://github.com/FreeTAKTeam/Reticulum-Community-Hub/blob/c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0/docs/r3s-telemetry.md) (`r3akt-map-core` `sensor*`), markers (`r3akt-map-core` `marker`), and mission commands/events (`r3akt-profile-rch`).
 
 ## Shape
 

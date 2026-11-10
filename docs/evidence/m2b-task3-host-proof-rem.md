@@ -45,7 +45,19 @@ relays carrying mission.marker.created: 1
    t 1794341459 SIMULATED UAS 49870b3d lat 45.00178878758535 lon 7.000265885091492 fixAtMs 1794341459000 receipt delivered
 ```
 
-The fix messages carry fields 3, 11 and 13 (task 2). No relay dispatch was rejected: every outgoing relay reached `delivered` or was still `sending`, and none stayed queued.
+The fix messages carry fields 3, 11 and 13 (task 2).
+
+**No relay was dropped or rejected** (addendum after the POST review). RCH records a rejected dispatch through `reject_broker_intent` in its own store, not in the daemon's messages, so this was checked in the hub database after all runs:
+
+```text
+rch_broker_dispatch: 130 rows, all state 'terminal', receipt 'delivered'
+rch_messages:        130 rows, all 'delivered' / 'accepted'; none 'rejected'
+rch_broker_inbox:    inbound 117 applied, 4 rejected (commands from 41f30fd3… before the team existed, not relays)
+a8e4643c (fresh store): 87 fix messages in, 86 distinct fix times -> 86 relays to REM for object 49870b3d
+4d8ffce8 (2a store):    18 fix messages in, 18 distinct fix times -> 18 relays to REM for object 8a4a8c24
+```
+
+Every distinct fix produced exactly one relay. The replayed fix changed nothing, so it was not relayed.
 
 ## REM
 
@@ -53,14 +65,18 @@ The fix messages carry fields 3, 11 and 13 (task 2). No relay dispatch was rejec
 |---|---|
 | During run 1 | map menu "Markers: 1, shown"; detail card `SIMULATED UAS 49870b3d`, **45.00179, 7.00027** (the relayed metadata position, first fix) |
 | After run 2 (restart) and the replay | unchanged |
-| After REM force-stop and relaunch | "Markers: 1, shown". On relaunch REM asked for the notification permission, which was declined. |
-| After the 2a-store run | "Markers: 2, shown": the second marker is the other aircraft `8a4a8c24`, relayed once with metadata at its first fix |
+| After REM force-stop and relaunch | "Markers 1" (screenshot at 4:15 on the emulator clock, before the 2a-store run). On relaunch REM asked for the notification permission, which was declined. |
+| After the 2a-store run | "Markers 2" (screenshot at 4:21): the second marker is the other aircraft `8a4a8c24`, relayed once with metadata at its first fix |
 
 ![REM map with the SIMULATED UAS 49870b3d marker over the Alps](m2b-task3-rem-map.png)
 
 ![REM marker detail: SIMULATED UAS 49870b3d, 45.00179, 7.00027](m2b-task3-rem-marker-detail.png)
 
-At the same time the hub origin had moved to 45.000094, 7.002540 (`fixAtMs 1794341556000`). REM keeps the first relayed position; this is "appearance only" (D-6).
+![REM map menu after force-stop and relaunch: Markers 1](m2b-task3-rem-after-relaunch.png)
+
+![REM map menu after the 2a-store run: Markers 2](m2b-task3-rem-after-2a-store.png)
+
+By the end of run 2 the hub origin had moved to 45.000094, 7.002540 (`fixAtMs 1794341556000`). REM kept the first relayed position throughout, which is "appearance only" (D-6).
 
 ## 2a store against the 2b hub
 
