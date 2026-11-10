@@ -6,26 +6,46 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import org.r3akt.uas.hud.HudState
 import org.r3akt.uas.hud.HudView
 
-/** The flight cockpit: the HUD skin over the aircraft source, refreshed at 1 Hz. */
+/** The flight cockpit: the HUD skin over the aircraft source and its live video. */
 class MainActivity : Activity() {
+    private lateinit var root: FrameLayout
     private lateinit var hud: HudView
+    private var video: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private var seq = 0u
+    /** The last rejected action in full; the HUD strip shortens long DJI texts. */
+    private var lastRejection: String? = null
 
     private val tick = object : Runnable {
         override fun run() {
-            hud.state = runCatching { Variant.source.cockpit(seq++) }
+            val state = runCatching { Variant.source.cockpit(seq++) }
                 .getOrElse { HudState(status = "SOURCE ERROR", simulated = false) }
-            handler.postDelayed(this, 1000)
+            hud.state = state
+            showVideo(state.video)
+            handler.postDelayed(this, Variant.source.periodMs)
+        }
+    }
+
+    private fun showVideo(on: Boolean) {
+        if (on && video == null) {
+            video = Variant.source.videoView(this)?.also {
+                root.addView(it, 0, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT, Gravity.CENTER))
+            }
+        } else if (!on && video != null) {
+            root.removeView(video)
+            video = null
         }
     }
 
@@ -35,7 +55,21 @@ class MainActivity : Activity() {
         hud = HudView(this)
         hud.onBack = { finish() }
         hud.onLog = ::showReport
-        setContentView(hud)
+        // Sent once, on the tap; a rejection is shown and never queued or retried (UAS-FLT-004, UAS-FLT-005).
+        hud.onAction = { action ->
+            Variant.source.perform(action) { error ->
+                runOnUiThread {
+                    if (error != null && !isDestroyed) {
+                        val title = "${action.name.replace('_', ' ')} REJECTED · NOT RETRIED"
+                        lastRejection = "$title\nDJI: $error"
+                        hud.alert = title to "DJI: $error"
+                    }
+                }
+            }
+        }
+        root = FrameLayout(this).apply { addView(hud) }
+        setContentView(root)
+        Variant.source.start(this)
         hideSystemBars()
     }
 
@@ -68,7 +102,7 @@ class MainActivity : Activity() {
         val text = TextView(this).apply {
             setPadding(32, 32, 32, 32)
             setTextIsSelectable(true)
-            this.text = "R3AKT UAS (${Variant.source.name})\n\n$report"
+            this.text = "R3AKT UAS (${Variant.source.name})\n\n$report" + (lastRejection?.let { "\n\n$it" } ?: "")
         }
         AlertDialog.Builder(this)
             .setView(ScrollView(this).apply { addView(text) })

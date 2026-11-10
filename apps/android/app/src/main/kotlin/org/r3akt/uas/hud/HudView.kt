@@ -6,6 +6,9 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.os.Build
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -28,10 +31,15 @@ class HudView(context: Context) : ViewGroup(context) {
     private class Place(val x: Float, val y: Float, val w: Float, val h: Float, val anchor: Anchor) : LayoutParams(0, 0)
 
     var state = HudState(status = "NOT CONNECTED", simulated = false)
-        set(value) { field = value; applyState(); invalidate() }
+        set(value) { field = value; applyState() }
+
+    /** An action error (title, detail); stays until the operator dismisses it (UAS-FLT-005). */
+    var alert: Pair<String, String>? = null
+        set(value) { field = value; applyState() }
 
     var onBack: () -> Unit = {}
     var onLog: () -> Unit = {}
+    var onAction: (FlightAction) -> Unit = {}
 
     private val label = resources.getFont(R.font.rajdhani_bold)
     private val mono = resources.getFont(R.font.b612mono_bold)
@@ -45,6 +53,8 @@ class HudView(context: Context) : ViewGroup(context) {
 
     private var flightOpen = false
     private var menuOpen = false
+    /** The action waiting in the confirm panel. */
+    private var pending: FlightAction? = null
 
     private fun button(icon: Icon?, text: String = "", bare: Boolean = false, shutter: Boolean = false) =
         HudButton(context, { s }, label, icon, text, bare, shutter)
@@ -54,12 +64,15 @@ class HudView(context: Context) : ViewGroup(context) {
     private val flight = button(Hud.aircraft, "FLIGHT")
     private val takeoffLand = button(Hud.takeoff, "TAKEOFF")
     private val rth = button(Hud.home, "RTH")
-    private val cameraMode = button(Hud.photo).apply { contentDescription = "Camera mode" }
+    private val cameraMode = button(Hud.photo).apply { contentDescription = "Camera mode, not built yet"; isEnabled = false }
     private val shutterButton = button(null, shutter = true).apply { contentDescription = "Take photo" }
     private val menu = button(Hud.menu, "MENU")
     private val map = button(Hud.map, "MAP").apply { contentDescription = "Map, not built yet"; isEnabled = false }
     private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations, not built yet"; isEnabled = false }
     private val log = button(Hud.log, "LOG").apply { contentDescription = "Session log" }
+    private val slider = HudSlider(context, { s }, label)
+    private val cancel = button(null, "CANCEL")
+    private val dismiss = button(Hud.close, bare = true).apply { contentDescription = "Dismiss error" }
 
     init {
         setWillNotDraw(false)
@@ -74,9 +87,18 @@ class HudView(context: Context) : ViewGroup(context) {
         add(map, 692f, 476f, 60f, 52f, Anchor.RIGHT)
         add(observations, 756f, 476f, 60f, 52f, Anchor.RIGHT)
         add(log, 820f, 476f, 60f, 52f, Anchor.RIGHT)
+        add(slider, 308f, 266f, 344f, 52f, Anchor.CENTER)
+        add(cancel, 562f, 330f, 90f, 44f, Anchor.CENTER)
+        add(dismiss, 642f, 408f, 44f, 44f, Anchor.CENTER)
 
         back.setOnClickListener { onBack() }
         log.setOnClickListener { onLog() }
+        takeoffLand.setOnClickListener { pending = if (state.airborne == true) FlightAction.LAND else FlightAction.TAKEOFF; applyState() }
+        rth.setOnClickListener { if (state.rthActive) onAction(FlightAction.STOP_RTH) else { pending = FlightAction.RTH; applyState() } }
+        shutterButton.setOnClickListener { onAction(FlightAction.PHOTO) }
+        slider.onConfirm = { pending?.let { pending = null; applyState(); onAction(it) } }
+        cancel.setOnClickListener { pending = null; applyState() }
+        dismiss.setOnClickListener { alert = null }
         flight.setOnClickListener { flightOpen = !flightOpen; applyState() }
         menu.setOnClickListener { menuOpen = !menuOpen; applyState() }
         applyState()
@@ -91,12 +113,19 @@ class HudView(context: Context) : ViewGroup(context) {
         takeoffLand.label = if (landing) "LAND" else "TAKEOFF"
         takeoffLand.isEnabled = (if (landing) FlightAction.LAND else FlightAction.TAKEOFF) in st.actions
         takeoffLand.contentDescription = takeoffLand.label + if (takeoffLand.isEnabled) "" else ", unavailable"
-        rth.isEnabled = FlightAction.RTH in st.actions
+        rth.isEnabled = (if (st.rthActive) FlightAction.STOP_RTH else FlightAction.RTH) in st.actions
         rth.tone = if (st.rthActive) HudButton.Tone.CAUTION else HudButton.Tone.NORMAL
         rth.label = if (st.rthActive) "STOP RTH" else "RTH"
         rth.contentDescription = (if (st.rthActive) "Stop return to home" else "Return to home") + if (rth.isEnabled) "" else ", unavailable"
-        cameraMode.isEnabled = FlightAction.PHOTO in st.actions
         shutterButton.isEnabled = FlightAction.PHOTO in st.actions
+
+        // UAS-FLT-004: a confirm never outlives its action, so nothing fires after a disconnect.
+        if (pending !in st.actions) pending = null
+        val confirm = pending
+        if (confirm != null) slider.label = confirmText(confirm).third
+        slider.visibility = if (confirm != null) VISIBLE else GONE
+        cancel.visibility = slider.visibility
+        dismiss.visibility = if (alert != null) VISIBLE else GONE
 
         flight.icon = if (flightOpen) Hud.close else Hud.aircraft
         flight.label = if (st.rthActive) "RTH ON" else "FLIGHT"
@@ -108,6 +137,16 @@ class HudView(context: Context) : ViewGroup(context) {
         menu.icon = if (menuOpen) Hud.close else Hud.menu
         menu.contentDescription = if (menuOpen) "Close menu" else "Menu"
         for (v in listOf(map, observations, log)) v.visibility = if (menuOpen) VISIBLE else GONE
+        invalidate()
+    }
+
+    private fun confirmText(action: FlightAction) = when (action) {
+        FlightAction.LAND -> Triple("CONFIRM LANDING",
+            "Aircraft descends and lands at its current position. Check that the area below is clear.", "SLIDE TO LAND")
+        FlightAction.RTH -> Triple("CONFIRM RETURN TO HOME",
+            "Aircraft flies back to the recorded home point and lands there.", "SLIDE TO RETURN")
+        else -> Triple("CONFIRM TAKEOFF",
+            "Aircraft climbs to 1.2 m above the take-off point and hovers. Check that the area is clear.", "SLIDE TO TAKE OFF")
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
@@ -162,7 +201,7 @@ class HudView(context: Context) : ViewGroup(context) {
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.SQUARE }
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val text = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
     private val path = Path()
 
@@ -205,18 +244,60 @@ class HudView(context: Context) : ViewGroup(context) {
 
     override fun onDraw(canvas: Canvas) {
         val st = state
-        canvas.drawColor(0xFF0A0F0B.toInt())
-        // Live DJI video arrives with the milestone 4 connection flow.
-        write(canvas, "NO VIDEO", x(480f, Anchor.CENTER), y(186f), 13f, Hud.DIM, align = Paint.Align.CENTER, spacing = 0.2f)
+        // With live video the canvas stays clear so the video view behind shows through.
+        if (!st.video) {
+            canvas.drawColor(0xFF0A0F0B.toInt())
+            // The confirm panel covers this spot.
+            if (pending == null) write(canvas, "NO VIDEO", x(480f, Anchor.CENTER), y(186f), 13f, Hud.DIM, align = Paint.Align.CENTER, spacing = 0.2f)
+        }
 
         drawTopBar(canvas, st)
         drawHeading(canvas, st.headingDeg)
         drawSpeed(canvas, st)
         drawAltitude(canvas, st)
         drawGimbal(canvas, st.gimbalPitchDeg)
-        drawReticle(canvas)
+        val confirm = pending
+        if (confirm == null) drawReticle(canvas) else drawConfirm(canvas, st, confirm)
         drawRadar(canvas, st.headingDeg)
         drawTelemetry(canvas, st)
+        alert?.let { drawAlert(canvas, it.first, it.second) }
+    }
+
+    private fun drawConfirm(c: Canvas, st: HudState, action: FlightAction) {
+        val l = x(290f, Anchor.CENTER)
+        val (title, body) = confirmText(action)
+        box(c, l, y(166f), l + 380 * s, y(390f))
+        write(c, title, l + 18 * s, y(194f), 13f, Hud.GREEN, spacing = 0.14f)
+        // Never claims a home point that is not known.
+        val home = st.homeDistanceM != null
+        write(c, if (home) "HOME RECORDED" else "NO HOME POINT", l + 362 * s, y(194f), 12f,
+            if (home) Hud.WHITE else Hud.AMBER, monospace = true, align = Paint.Align.RIGHT)
+        text.typeface = label; text.textSize = 14 * s; text.color = Hud.WHITE
+        text.textAlign = Paint.Align.LEFT; text.letterSpacing = 0f
+        c.save()
+        c.translate(l + 18 * s, y(204f))
+        StaticLayout.Builder.obtain(body, 0, body.length, text, (344 * s).toInt()).setMaxLines(3).build().draw(c)
+        c.restore()
+    }
+
+    private fun drawAlert(c: Canvas, title: String, detail: String) {
+        val l = x(270f, Anchor.CENTER)
+        val t = y(404f)
+        plate(c, l, t, l + 420 * s, t + 52 * s, 0x59280606)
+        line.color = Hud.RED; line.strokeWidth = 2f * s
+        c.drawRect(l, t, l + 420 * s, t + 52 * s, line)
+        val u = 22 * s / 24
+        val ix = l + 12 * s
+        val iy = t + 15 * s
+        path.reset()
+        path.moveTo(ix + 12 * u, iy + 3 * u); path.lineTo(ix + 22 * u, iy + 21 * u); path.lineTo(ix + 2 * u, iy + 21 * u); path.close()
+        path.moveTo(ix + 12 * u, iy + 10 * u); path.lineTo(ix + 12 * u, iy + 15 * u)
+        path.moveTo(ix + 12 * u, iy + 18 * u); path.lineTo(ix + 12 * u, iy + 18.5f * u)
+        c.drawPath(path, line)
+        write(c, title, l + 44 * s, t + 22 * s, 13f, Hud.RED)
+        text.typeface = mono; text.textSize = 12 * s; text.letterSpacing = 0f
+        val shown = TextUtils.ellipsize(detail, text, 318 * s, TextUtils.TruncateAt.END).toString()
+        write(c, shown, l + 44 * s, t + 40 * s, 12f, Hud.WHITE, monospace = true)
     }
 
     private fun drawTopBar(c: Canvas, st: HudState) {

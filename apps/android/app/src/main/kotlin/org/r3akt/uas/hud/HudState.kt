@@ -3,7 +3,7 @@ package org.r3akt.uas.hud
 import org.r3akt.uas.bridge.AltitudeReference
 
 /** Local flight actions; a button is enabled only when the source offers it (UAS-FLT-002). */
-enum class FlightAction { TAKEOFF, LAND, RTH, PHOTO }
+enum class FlightAction { TAKEOFF, LAND, RTH, STOP_RTH, PHOTO }
 
 /**
  * What the cockpit HUD shows. `null` means unknown and is drawn as a dash,
@@ -28,4 +28,6 @@ data class HudState(
     val gimbalPitchDeg: Double? = null,
     val flightTimeS: Long? = null,
     val actions: Set<FlightAction> = emptySet(),
+    /** True while a live video surface should sit behind the HUD. */
+    val video: Boolean = false,
 )

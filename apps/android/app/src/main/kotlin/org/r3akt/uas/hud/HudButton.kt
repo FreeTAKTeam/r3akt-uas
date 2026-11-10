@@ -1,5 +1,6 @@
 package org.r3akt.uas.hud
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
@@ -8,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 
@@ -102,10 +104,10 @@ class HudButton(
             paint.pathEffect = null
         }
 
-        val iconSize = (if (label.isEmpty()) 22f else 24f) * k
+        val iconSize = if (icon == null) 0f else (if (label.isEmpty()) 22f else 24f) * k
+        val gap = if (icon == null || label.isEmpty()) 0f else 3 * k
         val textSize = 10 * k
-        val total = iconSize + if (label.isEmpty()) 0f else 3 * k + textSize
-        var top = (h - total) / 2
+        var top = (h - iconSize - gap - if (label.isEmpty()) 0f else textSize) / 2
         val halo = tone == Tone.NORMAL || bare || dim
         icon?.let { draw ->
             path.reset()
@@ -121,7 +123,7 @@ class HudButton(
             paint.color = ink
             if (halo) paint.setShadowLayer(1.5f * k, 0f, 0f, Hud.HALO)
             canvas.drawPath(path, paint)
-            top += iconSize + 3 * k
+            top += iconSize + gap
         }
         if (label.isNotEmpty()) {
             paint.reset()
@@ -134,6 +136,96 @@ class HudButton(
             if (halo) paint.setShadowLayer(1.5f * k, 0f, 0f, Hud.HALO)
             canvas.drawText(label, w / 2, top + textSize * 0.8f, paint)
         }
+    }
+}
+
+/** Slide-to-confirm for flight actions: a tap does nothing; dragging the knob to the far end confirms. */
+class HudSlider(context: Context, private val unit: () -> Float, private val font: Typeface) : View(context) {
+    var label = ""
+        set(value) { field = value; contentDescription = value; invalidate() }
+    var onConfirm: () -> Unit = {}
+
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val path = Path()
+    private val box = RectF()
+    private var slide = 0f
+    private var dragging = false
+
+    init {
+        isClickable = true
+        isFocusable = true
+    }
+
+    override fun getAccessibilityClassName(): CharSequence = Button::class.java.name
+
+    // TalkBack and keyboard activation; touch never gets here because onTouchEvent does not call super.
+    override fun performClick(): Boolean {
+        super.performClick()
+        onConfirm()
+        return true
+    }
+
+    @SuppressLint("ClickableViewAccessibility") // a touch must slide, never click
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> dragging = e.x <= height
+            MotionEvent.ACTION_MOVE -> if (dragging) slide = ((e.x - height / 2f) / (width - height)).coerceIn(0f, 1f)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val done = dragging && e.actionMasked == MotionEvent.ACTION_UP && slide >= 0.95f
+                dragging = false
+                slide = 0f
+                if (done) onConfirm()
+            }
+        }
+        invalidate()
+        return true
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val k = unit()
+        val w = width.toFloat()
+        val h = height.toFloat()
+        box.set(0.75f * k, 0.75f * k, w - 0.75f * k, h - 0.75f * k)
+        paint.reset()
+        paint.isAntiAlias = true
+        paint.color = 0x0FFFFFFF
+        canvas.drawRoundRect(box, 3 * k, 3 * k, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.5f * k
+        paint.color = Hud.WHITE
+        canvas.drawRoundRect(box, 3 * k, 3 * k, paint)
+
+        paint.reset()
+        paint.isAntiAlias = true
+        paint.typeface = font
+        paint.textSize = 14 * k
+        paint.letterSpacing = 0.16f
+        paint.textAlign = Paint.Align.CENTER
+        paint.color = Hud.WHITE
+        paint.setShadowLayer(1.5f * k, 0f, 0f, Hud.HALO)
+        canvas.drawText(label, w / 2 + 20 * k, h / 2 + 5 * k, paint)
+
+        val pad = 4.5f * k
+        val side = h - 2 * pad
+        val left = pad + slide * (w - h)
+        paint.reset()
+        paint.isAntiAlias = true
+        paint.color = Hud.GREEN
+        canvas.drawRoundRect(left, pad, left + side, h - pad, 2 * k, 2 * k, paint)
+        val u = 22 * k / 24
+        val ox = left + (side - 24 * u) / 2
+        val oy = (h - 24 * u) / 2
+        path.reset()
+        for (cx in listOf(5f, 12f)) {
+            path.moveTo(ox + cx * u, oy + 6 * u)
+            path.lineTo(ox + (cx + 6) * u, oy + 12 * u)
+            path.lineTo(ox + cx * u, oy + 18 * u)
+        }
+        paint.style = Paint.Style.STROKE
+        paint.strokeCap = Paint.Cap.SQUARE
+        paint.strokeWidth = 2.6f * k
+        paint.color = Hud.INK_GO
+        canvas.drawPath(path, paint)
     }
 }
 

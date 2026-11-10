@@ -19,6 +19,8 @@ for pair in aarch64-linux-android:arm64-v8a x86_64-linux-android:x86_64; do
   abi=${pair##*:}
   upper=$(echo "$target" | tr '[:lower:]-' '[:upper:]_')
   export "CARGO_TARGET_${upper}_LINKER=$bin/${target}${api}-clang"
+  # NDK 27 links for 4 KB pages by default; Android 15+ devices may use 16 KB.
+  export "CARGO_TARGET_${upper}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384"
   cargo build --manifest-path "$root/Cargo.toml" -p r3akt-uas-app --release --locked --target "$target"
   mkdir -p "$out/jniLibs/$abi"
   cp "$target_dir/$target/release/libr3akt_uas_app.so" "$out/jniLibs/$abi/"
