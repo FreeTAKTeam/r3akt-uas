@@ -26,8 +26,9 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: Install NDK and platform
-        run: sdkmanager "ndk;27.0.12077973" "platforms;android-35" "build-tools;35.0.0"
+        with:
+          # The default list includes the obsolete "tools" package, which sdkmanager no longer serves.
+          packages: platforms;android-35 build-tools;35.0.0 ndk;27.0.12077973
       - name: Install pinned Rust toolchain
         run: rustup show active-toolchain || rustup toolchain install
       - name: Build simulator and DJI 4 variants
