@@ -2,7 +2,7 @@
 
 Every requirement ID defined in the specification appears exactly once in the table below. `scripts/check_docs.py` fails when an ID is defined but untraced, traced but undefined, or referenced in code but undefined.
 
-Status values: **specified** (no implementation), **scaffold-proven** (shown by the evidence named, in the scope named), **implemented but unproven** (code exists, required evidence not yet captured). No product milestone (2–6) has passed. The PRE and POST reviews and their resolutions are recorded in [pre-review.md](../integration/pre-review.md); the focused PRE on the [milestone 2 task plan](../goals/m2-vertical-slice/PLAN.md) passed for step 2a on 10 November 2026.
+Status values: **specified** (no implementation), **scaffold-proven** (shown by the evidence named, in the scope named), **proven in scope** (a product step's evidence captured, in the scope named; the milestone itself still needs owner acceptance), **implemented but unproven** (code exists, required evidence not yet captured). No product milestone (2–6) has passed. The PRE and POST reviews and their resolutions are recorded in [pre-review.md](../integration/pre-review.md); the focused PRE on the [milestone 2 task plan](../goals/m2-vertical-slice/PLAN.md) passed for step 2a on 10 November 2026.
 
 ## Milestones
 
@@ -38,13 +38,13 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRD-003 | 4, 6 | Compatibility matrix with physically tested rows | specified |
 | UAS-PRD-004 | 4 | Hardware flight evidence per action | implemented but unproven (take-off, landing, RTH, photo, video preview); recording and gimbal control specified |
 | UAS-PRD-005 | 4 | Radar evidence (see Radar) | specified |
-| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | specified |
+| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | proven in scope (step 2a: RCH store and API, [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence; the map view is blocked by G-20); REM specified |
 | UAS-PRD-007 | 5 | TCP and RNode operation evidence | specified |
 | UAS-PRD-008 | 5 | Detection promotion evidence | specified |
 | UAS-PRD-009 | 5 | MediaMTX playback evidence | specified |
 | UAS-PRD-010 | 5 | Offline/mesh evidence | specified |
 | UAS-PRD-011 | 1, 6 | EPL-2.0 `LICENSE`, `THIRD_PARTY_NOTICES.md` (1); signed APK (6) | scaffold-proven (licensing); signing specified |
-| UAS-PRD-012 | 2, 4 | No flight command path in RCH integration; review + tests | specified |
+| UAS-PRD-012 | 2, 4 | No flight command path in RCH integration; review + tests | proven in scope (step 2a: the publisher has no receive path, G-17; POST review) |
 | UAS-ARC-001 | 1–5 | Architecture review at each milestone gate | specified |
 | UAS-ARC-003 | 1–5 | Architecture review at each milestone gate | specified |
 | UAS-ARC-004 | 1–5 | Architecture review at each milestone gate | specified |
@@ -54,15 +54,15 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-ARC-008 | 1–5 | Architecture review at each milestone gate | specified |
 | UAS-ARC-002 | 1 | `scripts/check_boundaries.py` passes (dependency-level guard; code review covers hand-written codecs) | scaffold-proven (dependencies) |
 | UAS-ARC-009 | 1 | Git revisions in `Cargo.toml`; committed `Cargo.lock`, `libs.versions.toml` | scaffold-proven |
-| UAS-ARC-010 | 1, 2 | Reuse matrix: inspected column filled (1); qualified column filled after integration tests (2) | scaffold-proven (inspected only) |
-| UAS-ARC-011 | 1 | Generated `native-bridge` Kotlin; emulator round trip | scaffold-proven |
+| UAS-ARC-010 | 1, 2 | Reuse matrix: inspected column filled (1); qualified column filled after integration tests (2) | proven in scope (RCH `c2bf78a` and LXMF-rs `888355c` qualified by the step 2a proofs) |
+| UAS-ARC-011 | 1 | Generated `native-bridge` Kotlin; emulator round trip | scaffold-proven; step 2a `simNet` calls the generated `publish_*` bindings on a Pixel 7 |
 | UAS-PRF-001 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
-| UAS-PRF-002 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
-| UAS-PRF-003 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
+| UAS-PRF-002 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | proven in scope (step 2a, RCH: app identity and object id persist across force-stop and relaunch; [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence); REM specified |
+| UAS-PRF-003 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | proven in scope (step 2a, RCH: one aircraft object per identity after restarts and a replayed fix; [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence); REM specified |
 | UAS-PRF-005 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
 | UAS-PRF-006 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
-| UAS-PRF-009 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
-| UAS-PRF-010 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
+| UAS-PRF-009 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | proven in scope (step 2a, RCH: position travels as the shared R3S origin fix; [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence); REM specified |
+| UAS-PRF-010 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | proven in scope (step 2a, RCH: origin fix on field 13 only, no field 2/3/11; [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence); REM specified |
 | UAS-PRF-011 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
 | UAS-PRF-004 | 1, 3 | Unit test `takeoff_relative_and_unknown_altitude_are_not_published` (1); R3S datum mapping (3) | scaffold-proven (Telemeter path) |
 | UAS-PRF-007 | 1, 3 | Unit test speed km/h round trip; `fixtures/telemetry/sim-orbit-v1.jsonl` | scaffold-proven (Telemeter path) |
@@ -103,7 +103,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-SCF-002 | 1 | Sim APK contains no `dji` entries; built with empty `djiApiKey` | scaffold-proven |
 | UAS-SCF-003 | 1, 4 | `:app:assembleDji4Debug` builds and runs on a Pixel 7 (arm64, Android 17) | scaffold-proven |
 | UAS-SCF-004 | 1 | Emulator screenshot of shared encode/decode via generated bindings | scaffold-proven |
-| UAS-SCF-005 | 1, 2, 4 | Sim merged manifest has no INTERNET/USB permission and runs offline. The dji4 variant carries INTERNET and the DJI USB accessory activity; built without `djiApiKey` (the default) it never starts the SDK manager and shows `NO DJI KEY` on a Pixel 7. With a key it registers with DJI and listens for an aircraft; it publishes nothing. | scaffold-proven (sim; dji4 without a key) |
+| UAS-SCF-005 | 1, 2, 4 | Sim merged manifest has no INTERNET/USB permission and runs offline. Step 2a: the publisher exists only with `-Pr3aktPublish=true`, which enables `simNet` and disables `sim`/`dji4`; CI asserts the default APKs carry no `publish` symbol and the sim APK no INTERNET. The dji4 variant carries INTERNET and the DJI USB accessory activity; built without `djiApiKey` (the default) it never starts the SDK manager and shows `NO DJI KEY` on a Pixel 7. With a key it registers with DJI and listens for an aircraft; it publishes nothing. | scaffold-proven (sim; dji4 without a key) |
 | UAS-SCF-006 | 1 | `uas-sim --check fixtures/telemetry/sim-orbit-v1.jsonl` | scaffold-proven |
 | UAS-SCF-007 | 1 | `packaging/` examples contain no credentials | scaffold-proven |
 | UAS-SCF-008 | 1 | `scripts/check.sh` passes locally; the `ci` workflow passed on GitHub for `bc5c54b`, `79c7c90` (main) and `d61c86b` | scaffold-proven |
@@ -117,6 +117,10 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 - Operator view: the simulator APK on an API 35 x86_64 emulator shows sample 0 encoded by the shared `r3akt-map-core` encoder (90 bytes) and decoded by the shared decoder: [screenshot](../evidence/scaffold-sim-emulator-api35.png).
 - DJI 4 variant: it failed to start with `ClassNotFoundException: dji.sdk.sdkmanager.DJISDKManager`. The cause recorded here at the time (no x86_64 native libraries) was wrong: a static initializer used a DJI class before the SDK's class loader was installed. Corrected in the milestone 4 record below.
 - Receiving-client evidence (RCH map, REM) does not apply to the scaffold: nothing is published. It is the milestone 2 gate (RCH map in step 2a, REM in step 2b).
+
+## Milestone 2a evidence record (10 November 2026)
+
+Step 2a's evidence is captured; the milestone awaits owner acceptance. A simulated aircraft, from the host tool and from the `simNet` test build on a Pixel 7, reaches RCH `c2bf78a` through the shared LXMF-rs `888355c` runtime as one `mission.marker.create` (field 9) and R3S origin fixes (field 13). Each identity keeps exactly one marker and one origin after restarts, a force-stop and replayed fixes, and the origin follows the orbit: [host proof](../evidence/m2a-task5-hub-host-proof.md), [device proof](../evidence/m2a-task6-device-proof.md), POST review in [pre-review.md](../integration/pre-review.md). The RCH map view itself cannot show it at `c2bf78a` (G-20, RCH #305); REM is step 2b.
 
 ## Milestone 4 evidence record (10 November 2026, partial)
 

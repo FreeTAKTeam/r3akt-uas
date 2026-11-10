@@ -7,6 +7,8 @@ plugins {
 
 val repoRoot = rootDir.resolve("../..")
 val generated = layout.buildDirectory.dir("generated/rust").get().asFile
+// -Pr3aktPublish=true builds the RCH publisher in (simNet test build only, D-4).
+val publish = providers.gradleProperty("r3aktPublish").map(String::toBoolean).getOrElse(false)
 
 val cargoBuild by tasks.registering(Exec::class) {
     description = "Builds the Rust integration and generates Kotlin bindings."
@@ -16,8 +18,11 @@ val cargoBuild by tasks.registering(Exec::class) {
         repoRoot.resolve("Cargo.toml"), repoRoot.resolve("Cargo.lock"),
         repoRoot.resolve("rust-toolchain.toml"), repoRoot.resolve("scripts/build-android-native.sh"),
     )
+    inputs.property("r3aktPublish", publish)
     outputs.dir(generated)
-    commandLine(repoRoot.resolve("scripts/build-android-native.sh").path, generated.path)
+    commandLine(
+        repoRoot.resolve("scripts/build-android-native.sh").path, generated.path, if (publish) "publish" else "",
+    )
 }
 
 android {

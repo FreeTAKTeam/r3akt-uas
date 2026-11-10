@@ -71,8 +71,24 @@ Also confirmed by the second pass: `encode_commands` and `encode_events` return 
 
 Both reviewers recommended starting task 1 once the text corrections were applied, with a POST review of the task 5 hub evidence before the Android publisher work.
 
+## POST: milestone 2a task 5 hub evidence (10 November 2026)
+
+One fresh reviewer read tasks 2 to 5 (commits `1978e2c`, `37e4a78`, `9eb6a82`, `b93cddb`), the [hub proof](../evidence/m2a-task5-hub-host-proof.md) and the pinned shared sources, and ran the feature tests. Verdict: **partially aligned, no blocker.** No kill criterion is hit: no protocol code is written here (the only glue is a serde round trip of the shared `SensorEvent` into the shared `EventEnvelope`, as the hub's own producer does), no field 2 is sent, no path leads to a second aircraft object, nothing received reaches a flight command, and default builds carry no publisher. G-20 was confirmed in the pinned source, so the store and API output stands in for the map screenshot.
+
+| # | Severity | Finding | Checked | Resolution |
+|---|---|---|---|---|
+| F1 | major | `publish_stop` joins the worker, which may be inside a send waiting up to 20 s for the hub's path; called from the UI thread it risks an ANR. | yes (`lxmf-runtime` `backend.rs`, `delivery.rs`, `config.rs`) | Each send now waits at most 5 s for the path (`SEND_PATH_TIMEOUT_MS`); task 6 calls `publish_stop` off the main thread. |
+| F2 | major | The create is fire-and-forget: if its one packet is lost, every fix of the session is skipped silently. | yes (`delivery.rs` `ensure_sent`) | The stored create bytes are re-sent on every new connection (the hub de-duplicates by `command_id`); recorded as a known limit. |
+| F3 | major | The proof ran with `[hub] announce_interval = 10`, not in the plan. | yes | Recorded as hub test configuration in task 6 (configuration, not an RCH change). |
+| F4, F5 | minor | Movement, per-run order and counts, scripts and the API JSON were summarized, not shown. | yes | Evidence addendum: per-run ordered trace, positions 10 s apart, both scripts and the verbatim `/api/markers`. Counts were only taken after the last run (markers are never deleted in this flow). |
+| F6 | minor | A panic in shared code would end the worker without setting `Failed`. | yes | Worker body runs under `catch_unwind` and sets `Failed`. |
+| F7 | minor | A non-ASCII 32-byte hub hash panicked in the shared hex parser. | yes | Strict ASCII-hex check before use. |
+| F8 | minor | A replay counted as a fix; `hub_connected` stayed true after stop. | yes | Replays are not counted; stop clears `hub_connected`. A reconnect inside one 1 s poll is still not seen (documented). |
+| F9 | minor | The worker loop has no host test. | — | Accepted; the hub trace covers it. |
+| F10 | minor | Speed, course and accuracy are always sent; the simulator has them, a DJI source may not. | yes (`telemetry.rs`) | Noted at G-07: `TelemetrySample` needs optional values before a DJI source publishes (M3). |
+
 ## Gate status
 
 - Milestone 1 (specification and scaffold): complete. The `ci` workflow builds from a clone on GitHub and passed, and the dji4 variant runs on a Pixel 7 (see the records in [acceptance.md](../specification/acceptance.md)).
-- PRE gate for milestone 2a: **passed on 10 November 2026.** The two blockers of the first focused PRE were ruled on by the owner, the second pass found no blocker, and its corrections are applied in plan revision 3. A POST review of the task 5 hub evidence gates task 6.
+- PRE gate for milestone 2a: **passed on 10 November 2026.** The two blockers of the first focused PRE were ruled on by the owner, the second pass found no blocker, and its corrections are applied in plan revision 3. The POST review of the task 5 hub evidence (above) found no blocker; its corrections are applied and task 6 may start.
 - Milestone 2b (REM) and milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE (PRE finding 1).

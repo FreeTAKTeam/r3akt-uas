@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# `--publish` drives the RCH publisher (milestone 2a); off by default (UAS-SCF-005).
+publish = ["r3akt-uas-app/publish"]
+
 [dependencies]
 r3akt-uas-app = { path = "../../crates/r3akt-uas-app" }
 serde_json.workspace = true
