@@ -65,7 +65,9 @@ object Dji4Sdk {
     @Volatile private var gimbalPitch: Double? = null
     @Volatile private var gimbalYaw: Double? = null
     @Volatile private var gimbalYawRelative: Double? = null
-    private var started = false
+    /** Whether [start] has run; before it, [Dji4Link.NO_KEY] only means "not checked yet". */
+    @Volatile var started = false
+        private set
 
     /** Registers the app with DJI and starts listening for an aircraft. Does nothing after the first call. */
     @Synchronized
@@ -218,6 +220,20 @@ object Dji4Sdk {
             if (sent == null) onResult("No aircraft connected")
         }.onFailure { onResult(it.message ?: it.toString()) }
     }
+
+    // Read-only details for the setup page, as the SDK reports them; `null` = not reported.
+    // The SDK manager is touched only once registered (UAS-SCF-005), and a getter that throws reads as unknown.
+    private val registered get() = link == Dji4Link.NO_AIRCRAFT || link == Dji4Link.CONNECTED
+
+    fun sdkVersion(): String? = if (registered) runCatching { DJISDKManager.getInstance().sdkVersion }.getOrNull() else null
+
+    /** The remote controller link as reported, or `null` when no product or controller is reported. */
+    fun remoteControllerConnected(): Boolean? = if (!registered) null else
+        runCatching { (DJISDKManager.getInstance().product as? Aircraft)?.remoteController?.isConnected }.getOrNull()
+
+    /** The connected aircraft's firmware package version, or `null`. */
+    fun firmware(): String? = aircraft.takeIf { link == Dji4Link.CONNECTED }
+        ?.let { runCatching { it.firmwarePackageVersion }.getOrNull() }?.takeIf { it.isNotBlank() }
 
     /** Status for the cockpit's LOG dialog. */
     fun describe(): String {

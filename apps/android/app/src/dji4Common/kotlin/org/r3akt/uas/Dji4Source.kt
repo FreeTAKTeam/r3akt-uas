@@ -83,6 +83,50 @@ object Dji4Source : AircraftSource {
         )
     }
 
+    override fun setupItems(): List<SetupItem> {
+        val d = Dji4Sdk.state()
+        val registered = d.link == Dji4Link.NO_AIRCRAFT || d.link == Dji4Link.CONNECTED
+        val connected = d.link == Dji4Link.CONNECTED
+        val needsRegistration = SetupItem("", SetupState.WAITING, "Needs DJI registration first")
+        return listOf(
+            when {
+                !Dji4Sdk.started -> SetupItem("DJI SDK key", SetupState.WAITING, "Not checked yet: the SDK starts after the INTERNET permission answer")
+                d.link == Dji4Link.NO_KEY -> SetupItem("DJI SDK key", SetupState.PROBLEM, "No djiApiKey in this build; the SDK is not registered and nothing connects")
+                else -> SetupItem("DJI SDK key", SetupState.OK, "Present in this build (not shown)")
+            },
+            when (d.link) {
+                Dji4Link.NO_KEY -> SetupItem("DJI registration", SetupState.WAITING, "Not attempted without a key")
+                Dji4Link.REGISTERING -> SetupItem("DJI registration", SetupState.WAITING, "Registering with DJI…")
+                Dji4Link.REGISTRATION_FAILED -> SetupItem("DJI registration", SetupState.PROBLEM, "DJI: ${d.error ?: "no error reported"}")
+                else -> SetupItem("DJI registration", SetupState.OK, "Registered, DJI SDK ${Dji4Sdk.sdkVersion() ?: "version not reported"}")
+            },
+            when (Dji4Sdk.remoteControllerConnected()) {
+                true -> SetupItem("Remote controller", SetupState.OK, "Connected (reported by the SDK)")
+                false -> SetupItem("Remote controller", SetupState.WAITING, "Not connected (reported by the SDK)")
+                null -> if (registered) SetupItem("Remote controller", SetupState.UNKNOWN, "Not reported: no DJI product on USB")
+                else needsRegistration.copy(item = "Remote controller")
+            },
+            when {
+                connected -> SetupItem("Aircraft", SetupState.OK, "Connected: ${d.model ?: "model not reported"}")
+                registered -> SetupItem("Aircraft", SetupState.WAITING, "No aircraft connected")
+                else -> needsRegistration.copy(item = "Aircraft")
+            },
+            Dji4Sdk.firmware()?.let { SetupItem("Firmware", SetupState.OK, it) }
+                ?: SetupItem("Firmware", SetupState.UNKNOWN, if (connected) "Not reported by the SDK" else "No aircraft connected"),
+            // The decoder's health is in the LOG report; reading it here would reset its rate counters.
+            if (connected) SetupItem("Video", SetupState.UNKNOWN, "Primary feed opened behind the HUD; feed rate and decoder state: LOG")
+            else SetupItem("Video", SetupState.WAITING, "No aircraft connected, no video"),
+        )
+    }
+
+    override fun configItems() = listOf(
+        "DJI SDK key" to when {
+            !Dji4Sdk.started -> "not checked yet"
+            Dji4Sdk.state().link == Dji4Link.NO_KEY -> "not configured"
+            else -> "configured (not shown)"
+        },
+    )
+
     /** The current DJI state as a publishable fix, or `null`: the rules are Rust's `dji_sample`. */
     fun fix(): TelemetrySample? {
         val d = Dji4Sdk.state()
