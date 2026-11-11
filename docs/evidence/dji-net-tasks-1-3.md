@@ -79,6 +79,15 @@ The marker panel gains a name field: a typed name replaces the picked Alpha–Zu
 - **Panel:** range (default 500 m) and bearing (default 0°) fields with AT OFFSET. The panel now scrolls in landscape.
 - **On the owner's request:** the Pixel's `simNet` build, connected to the R3AKT Server, placed the hostile marker "Putin 666" 500 m north of the simulated aircraft, at 45.004215, 6.997488 (object `376432932dff55d1fa285f3c1c26c067`). It is delivered to the hub's LXMF: 0 waiting. RCH shows it only if the simNet identity `8db22674…` has `mission.content.write` and is in team BLUE on that hub; the earlier "Putin 666" at the aircraft position is not shown there for that reason.
 
+## Why the markers did not show on the R3AKT Server
+
+- **Symptom:** three "Putin 666" markers (`33644d5b…`, `376432…`, `443469b3…`) from the simNet identity `8db22674…` left the phone, with 0 waiting, but never appeared on the R3AKT Server, even after that identity was given MISSION SUBSCRIBER. The simulated aircraft did appear: its create has no team field.
+- **Reproduced on the local hub (RCH `83b5d64a`):** a fresh identity `886249c2…` was granted `mission.content.write` but was not a team member.
+  - Its aircraft create (field 9 only) was accepted.
+  - Its team-scoped marker (fields 9 and 11) was taken by the hub, but nothing was created and there was no answer.
+  - After the identity was added to team BLUE, the same marker (`UAS Alpha-1`, hostile) was created and relayed.
+- **Cause (G-24):** each app identity must be a member of the team as well as hold the grant.
+
 ## Not yet shown
 
 The ground test (task 4) and the flight test (task 5) need the owner, a Mavic Air 2 or Air 2S with the RC-N1, and the hub reachable from the field (D-17). Until then everything from the aircraft onwards is implemented but unproven:
