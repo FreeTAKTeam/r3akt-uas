@@ -6,6 +6,7 @@ import android.location.Location
 import dji.common.error.DJIError
 import dji.common.error.DJISDKError
 import dji.common.flightcontroller.FlightControllerState
+import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
 import dji.sdk.base.BaseComponent
 import dji.sdk.base.BaseProduct
@@ -35,10 +36,18 @@ data class Dji4State(
     val goingHome: Boolean,
     val flightMode: String?,
     val satellites: Int?,
+    /** DJI `GPSSignalLevel` 0..5; `null` when DJI reports NONE. */
+    val gpsLevel: Int?,
+    /** Phone clock when this flight state arrived, epoch milliseconds. */
+    val receivedAtMs: Long?,
     val flightTimeS: Long?,
     val homeDistanceM: Double?,
     val batteryPercent: Int?,
     val gimbalPitchDeg: Double?,
+    /** Gimbal `attitudeInDegrees.yaw` and `yawRelativeToAircraftHeading`, as reported; their
+     *  meaning per product is recorded in the ground test before any use (D-15). */
+    val gimbalYawDeg: Double?,
+    val gimbalYawRelativeDeg: Double?,
     val hasCamera: Boolean,
 )
 
@@ -51,8 +60,11 @@ object Dji4Sdk {
     @Volatile private var error: String? = null
     @Volatile private var aircraft: Aircraft? = null
     @Volatile private var flight: FlightControllerState? = null
+    @Volatile private var flightAt: Long? = null
     @Volatile private var battery: Int? = null
     @Volatile private var gimbalPitch: Double? = null
+    @Volatile private var gimbalYaw: Double? = null
+    @Volatile private var gimbalYawRelative: Double? = null
     private var started = false
 
     /** Registers the app with DJI and starts listening for an aircraft. Does nothing after the first call. */
@@ -104,11 +116,18 @@ object Dji4Sdk {
     private fun attach(product: BaseProduct?) {
         val connected = (product as? Aircraft)?.takeIf { it.isConnected } ?: return detach()
         aircraft = connected
-        connected.flightController?.setStateCallback { flight = it }
+        connected.flightController?.setStateCallback {
+            flight = it
+            flightAt = System.currentTimeMillis()
+        }
         connected.battery?.setStateCallback { battery = it.chargeRemainingInPercent }
         connected.gimbal?.setStateCallback { state ->
-            gimbalPitch = state.attitudeInDegrees?.pitch
+            val attitude = state.attitudeInDegrees
+            gimbalPitch = attitude?.pitch
                 ?.takeUnless { it == dji.common.gimbal.Attitude.NO_ROTATION }?.toDouble()
+            gimbalYaw = attitude?.yaw
+                ?.takeUnless { it == dji.common.gimbal.Attitude.NO_ROTATION }?.toDouble()
+            gimbalYawRelative = state.yawRelativeToAircraftHeading.toDouble().takeIf { it.isFinite() }
         }
         link = Dji4Link.CONNECTED
     }
@@ -117,8 +136,11 @@ object Dji4Sdk {
     private fun detach() {
         aircraft = null
         flight = null
+        flightAt = null
         battery = null
         gimbalPitch = null
+        gimbalYaw = null
+        gimbalYawRelative = null
         if (link == Dji4Link.CONNECTED) link = Dji4Link.NO_AIRCRAFT
     }
 
@@ -153,10 +175,14 @@ object Dji4Sdk {
             goingHome = fc?.isGoingHome == true,
             flightMode = fc?.flightModeString,
             satellites = fc?.satelliteCount,
+            gpsLevel = fc?.gpsSignalLevel?.takeIf { it != GPSSignalLevel.NONE }?.value(),
+            receivedAtMs = flightAt.takeIf { fc != null },
             flightTimeS = fc?.flightTimeInSeconds?.toLong(),
             homeDistanceM = homeDistance(fc, pose),
             batteryPercent = battery.takeIf { live },
             gimbalPitchDeg = gimbalPitch.takeIf { live },
+            gimbalYawDeg = gimbalYaw.takeIf { live },
+            gimbalYawRelativeDeg = gimbalYawRelative.takeIf { live },
             hasCamera = product?.camera != null,
         )
     }
@@ -209,6 +235,11 @@ object Dji4Sdk {
             )
             s.error?.let { append("\nDJI: $it") }
             s.flightMode?.let { append("\nFlight mode: $it") }
+            // Recorded in the ground test (DJI plan task 4); shown as reported.
+            if (s.link == Dji4Link.CONNECTED) {
+                append("\nGPS level ${s.gpsLevel ?: "-"}, satellites ${s.satellites ?: "-"}")
+                append("\nGimbal yaw ${s.gimbalYawDeg ?: "-"}, relative to heading ${s.gimbalYawRelativeDeg ?: "-"}")
+            }
         }
     }
 }

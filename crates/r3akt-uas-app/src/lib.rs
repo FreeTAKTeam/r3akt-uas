@@ -21,5 +21,5 @@ pub mod publish;
 pub mod sim;
 pub mod telemetry;
 
-pub use dji::{AircraftPose, DjiFlightState, normalize_dji};
+pub use dji::{AircraftPose, DjiFlightState, dji_sample, normalize_dji};
 pub use telemetry::{AltitudeReference, DecodedTelemetry, TelemetrySample, UasError};

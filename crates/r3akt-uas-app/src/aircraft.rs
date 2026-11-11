@@ -125,8 +125,8 @@ mod tests {
             altitude_m: 30.0,
             altitude_reference: AltitudeReference::TakeoffRelative,
             ground_speed_mps: 5.0,
-            course_deg: 90.0,
-            horizontal_accuracy_m: 2.0,
+            course_deg: Some(90.0),
+            horizontal_accuracy_m: Some(2.0),
             battery_percent: None,
             simulated: true,
         }

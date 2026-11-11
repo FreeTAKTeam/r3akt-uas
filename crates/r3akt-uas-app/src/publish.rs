@@ -249,13 +249,34 @@ fn hex32(value: &str, what: &str) -> Result<String, PublishError> {
     }
 }
 
-/// Offers the latest fix. It replaces any fix not yet sent; nothing is queued.
+/// Fix time of the last fix handed to the worker, for the publication rate.
+static LAST_OFFERED_S: Mutex<Option<u64>> = Mutex::new(None);
+
+/// UAS-VID-005: 1 Hz while moving, 0.2 Hz while stationary.
+fn due(last_offered_s: Option<u64>, sample: &TelemetrySample) -> bool {
+    let interval_s = if sample.ground_speed_mps >= crate::dji::MIN_MOVING_SPEED_MPS {
+        1
+    } else {
+        5
+    };
+    last_offered_s.is_none_or(|last| sample.fix_time_s >= last.saturating_add(interval_s))
+}
+
+/// Offers the latest fix, however often the source polls. It always becomes the
+/// marker placement position; it goes to the hub only at the publication rate,
+/// replacing any fix not yet sent. Nothing is queued.
 #[uniffi::export]
 pub fn publish_offer_fix(sample: TelemetrySample) {
     *LAST_FIX
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sample.clone());
-    send_cmd(Cmd::Fix(sample));
+    let mut last = LAST_OFFERED_S
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if due(*last, &sample) {
+        *last = Some(sample.fix_time_s);
+        send_cmd(Cmd::Fix(sample));
+    }
 }
 
 pub(crate) fn last_fix() -> Option<TelemetrySample> {
@@ -340,11 +361,35 @@ type Net = (
     TcpRuntimeStatusHandle,
 );
 
+/// REM's announce capabilities (owner ruling D-19): RCH lists a peer as a REM client, which an
+/// operator can add to a team, only with `r3akt` and `emergencymessages`. The app handles no
+/// Emergency Action Messages and reads nothing the hub sends it (G-17).
+const ANNOUNCE_CAPABILITIES: [&str; 3] = ["r3akt", "emergencymessages", "telemetry"];
+
+/// The LXMF delivery announce app data RCH lists the app by: a display name and
+/// [`ANNOUNCE_CAPABILITIES`], encoded by LXMF-rs.
+fn announce_app_data(destination_hash: &str) -> Option<Vec<u8>> {
+    let name = format!(
+        "R3AKT UAS {}",
+        destination_hash.get(..8).unwrap_or(destination_hash)
+    );
+    let capabilities = ANNOUNCE_CAPABILITIES.map(str::to_owned);
+    lxmf_core::announce::encode_delivery_announce_app_data_with_capabilities(
+        &name,
+        None,
+        &capabilities,
+    )
+    .ok()
+}
+
 /// Constructs the transport, the announced delivery destination and one TCP client.
+/// Path responses carry the same `app_data` as the announce, or a hub asking for a path
+/// to the app would overwrite the app's name and capabilities with an empty announce.
 fn connect(
     runtime: &tokio::runtime::Runtime,
     private: &PrivateIdentity,
     hub_address: &str,
+    app_data: Option<Vec<u8>>,
 ) -> Result<Net, String> {
     runtime.block_on(async {
         let transport = Arc::new(Transport::new(TransportConfig::new(
@@ -354,6 +399,9 @@ fn connect(
         )));
         let destination = transport
             .add_destination(private.clone(), DestinationName::new("lxmf", "delivery"))
+            .await;
+        transport
+            .set_destination_announce_app_data(&destination, app_data)
             .await;
         let manager = transport.iface_manager();
         let client = manager
@@ -411,6 +459,7 @@ fn run(
 ) -> Result<(), String> {
     let identity = AppIdentity::load_or_create(dir).map_err(|e| e.to_string())?;
     let source_hex = identity.destination_hash();
+    let announce_data = announce_app_data(&source_hex);
     update(|s| {
         s.destination_hash = Some(source_hex.clone());
         s.object_id = Some(identity.object_id().to_owned());
@@ -421,7 +470,8 @@ fn run(
         .build()
         .map_err(|e| format!("tokio runtime: {e}"))?;
     let private = identity.private_identity().clone();
-    let (transport, destination, tcp) = connect(&runtime, &private, hub_address)?;
+    let (transport, destination, tcp) =
+        connect(&runtime, &private, hub_address, announce_data.clone())?;
     let source = runtime.block_on(async { destination.lock().await.desc.address_hash });
     let (backend, outbox) = backend_and_outbox(&runtime, transport.clone(), private, source, dir)?;
     let hub_hash =
@@ -472,7 +522,7 @@ fn run(
             continue;
         }
         if !announced {
-            runtime.block_on(transport.send_announce(&destination, None));
+            runtime.block_on(transport.send_announce(&destination, announce_data.as_deref()));
             announced = true;
         }
 
@@ -658,8 +708,8 @@ mod tests {
             altitude_m: 30.0,
             altitude_reference: reference,
             ground_speed_mps: 5.0,
-            course_deg: 90.0,
-            horizontal_accuracy_m: 2.0,
+            course_deg: Some(90.0),
+            horizontal_accuracy_m: Some(2.0),
             battery_percent: None,
             simulated: true,
         }
@@ -729,6 +779,40 @@ mod tests {
         };
         assert_eq!(keys(&with_team), ["11", "13", "3"]);
         assert_eq!(keys(&without), ["13"]);
+    }
+
+    #[test]
+    fn publication_rate_is_1_hz_moving_and_0_2_hz_stationary() {
+        let moving = sample(AltitudeReference::Msl);
+        let at = |s: &TelemetrySample, t: u64| TelemetrySample {
+            fix_time_s: t,
+            ..s.clone()
+        };
+        assert!(due(None, &moving));
+        assert!(!due(Some(100), &at(&moving, 100)));
+        assert!(due(Some(100), &at(&moving, 101)));
+        let still = TelemetrySample {
+            ground_speed_mps: 0.4,
+            ..moving
+        };
+        assert!(!due(Some(100), &at(&still, 104)));
+        assert!(due(Some(100), &at(&still, 105)));
+    }
+
+    #[test]
+    fn announce_names_the_app_like_a_rem_client() {
+        use lxmf_core::announce::{
+            capabilities_from_delivery_app_data, display_name_from_app_data,
+        };
+        let data = announce_app_data("8db226748847da27261859bff6e54ebe").unwrap();
+        assert_eq!(
+            display_name_from_app_data(Some(&data)).as_deref(),
+            Some("R3AKT UAS 8db22674")
+        );
+        assert_eq!(
+            capabilities_from_delivery_app_data(&data).unwrap(),
+            ["r3akt", "emergencymessages", "telemetry"]
+        );
     }
 
     #[test]

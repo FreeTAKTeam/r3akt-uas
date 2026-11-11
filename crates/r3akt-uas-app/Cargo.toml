@@ -18,7 +18,7 @@ publish = [
     "dep:r3akt-profile-rch", "dep:lxmf-sdk", "dep:lxmf-runtime",
     "dep:reticulum-rs-transport", "dep:reticulum-rs-core",
     "dep:tokio", "dep:base64", "dep:rand_core",
-    "dep:lxmf-propagation", "dep:rusqlite", "r3akt-map-core/sqlite",
+    "dep:lxmf-propagation", "dep:lxmf-wire", "dep:rusqlite", "r3akt-map-core/sqlite",
 ]
 
 [dependencies]
@@ -35,6 +35,7 @@ tokio = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 rand_core = { workspace = true, optional = true }
 lxmf-propagation = { workspace = true, optional = true }
+lxmf-wire = { workspace = true, optional = true }
 rusqlite = { workspace = true, optional = true }
 
 # Workspace lints forbid unsafe code; UniFFI's generated FFI scaffolding needs it,

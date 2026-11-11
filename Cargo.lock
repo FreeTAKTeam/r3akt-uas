@@ -1117,6 +1117,7 @@ dependencies = [
  "lxmf-propagation",
  "lxmf-runtime",
  "lxmf-sdk",
+ "lxmf-wire",
  "r3akt-map-core",
  "r3akt-profile-rch",
  "rand_core",

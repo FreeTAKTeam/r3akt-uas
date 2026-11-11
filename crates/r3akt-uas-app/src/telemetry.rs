@@ -43,8 +43,10 @@ pub struct TelemetrySample {
     /// Ground speed, metres per second.
     pub ground_speed_mps: f64,
     /// Course over ground, degrees true. Not aircraft heading (UAS-PRF-005).
-    pub course_deg: f64,
-    pub horizontal_accuracy_m: f64,
+    /// Unknown while hovering or when the source does not report it.
+    pub course_deg: Option<f64>,
+    /// Unknown when the source does not report it (DJI SDK 4 does not).
+    pub horizontal_accuracy_m: Option<f64>,
     /// Aircraft battery, percent (0-100), when reported.
     pub battery_percent: Option<f64>,
     /// True for simulator output; encoded in the Information sensor.
@@ -63,6 +65,8 @@ pub struct DecodedTelemetry {
 pub enum UasError {
     #[error("altitude is not MSL; the standard Telemeter location cannot carry it")]
     AltitudeReferenceNotMsl,
+    #[error("the standard Telemeter location needs {what}, which is unknown")]
+    MissingValue { what: String },
     #[error("shared codec rejected the sample: {reason}")]
     Codec { reason: String },
 }
@@ -85,13 +89,21 @@ pub fn encode_telemetry(sample: &TelemetrySample) -> Result<Vec<u8>, UasError> {
     if sample.altitude_reference != AltitudeReference::Msl {
         return Err(UasError::AltitudeReferenceNotMsl);
     }
+    // The standard location has no unknown course or accuracy; refuse, never default (UAS-PRF-009).
+    let missing = |what: &str| UasError::MissingValue {
+        what: what.to_owned(),
+    };
+    let bearing = sample.course_deg.ok_or_else(|| missing("course"))?;
+    let accuracy = sample
+        .horizontal_accuracy_m
+        .ok_or_else(|| missing("horizontal accuracy"))?;
     let location = telemetry_encode::Location {
         latitude: sample.latitude_deg,
         longitude: sample.longitude_deg,
         altitude: sample.altitude_m,
         speed: sample.ground_speed_mps * MPS_TO_KMH,
-        bearing: sample.course_deg,
-        accuracy: sample.horizontal_accuracy_m,
+        bearing,
+        accuracy,
         updated_at_s: sample.fix_time_s,
     };
     telemetry_encode::encode_with_information(
@@ -171,5 +183,24 @@ mod tests {
             Err(UasError::Codec { .. })
         ));
         assert!(decode_telemetry(&[0xc1]).is_err());
+    }
+
+    #[test]
+    fn unknown_course_or_accuracy_is_refused_not_defaulted() {
+        for sample in [
+            TelemetrySample {
+                course_deg: None,
+                ..sim::sample(0)
+            },
+            TelemetrySample {
+                horizontal_accuracy_m: None,
+                ..sim::sample(0)
+            },
+        ] {
+            assert!(matches!(
+                encode_telemetry(&sample),
+                Err(UasError::MissingValue { .. })
+            ));
+        }
     }
 }

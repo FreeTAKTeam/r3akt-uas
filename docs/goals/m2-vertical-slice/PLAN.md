@@ -28,7 +28,7 @@ Not in 2a: the `uas` extension, session and sequence fields (UAS-PRF-006 beyond 
 | D-1 | Revision set (G-08) | RCH `c2bf78a` with its pinned LXMF-rs `888355c`. Recorded as "qualified" only after task 6. |
 | D-2 | App Reticulum identity | Generated on first run, stored in Android private storage, never exported. A reinstall gives a new identity. |
 | D-3 | Aircraft object creation | The app creates the marker itself with `mission.marker.create` before any fix. Over LXMF the idempotency handle is the app-chosen `object_destination_hash` plus the `command_id` (the `Idempotency-Key` of the HTTP route does not exist here). |
-| D-4 | Network gate | Only a `simNet` test configuration can publish; the default simulator build keeps a manifest with no network permission (UAS-SCF-005). |
+| D-4 | Network gate | Only a `simNet` test configuration can publish; the default simulator build keeps a manifest with no network permission (UAS-SCF-005). Amended by D-18 (10 November 2026): the `dji4Net` test configuration may publish too, in publish builds only ([DJI field-trial plan](../dji-net/PLAN.md)). |
 | R-1 | Publish path | Hub first, REM next: the fix is sent as the existing R3S origin-fix event on field 13. |
 | R-2 | Transport | `reticulum-rs-transport` and `reticulum-rs-core` are allowed shared dependencies. This repository only constructs the transport, one TCP client interface, the announced delivery destination and the in-process backend; it adds no routing, queueing or interface-management logic. |
 

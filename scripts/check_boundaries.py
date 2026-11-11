@@ -21,7 +21,9 @@ SHARED = {"r3akt-map-core", "r3akt-profile-rch", "r3akt-protocol", "r3akt-mesh-d
           "reticulum-rs-transport", "reticulum-rs-core",
           # Owner ruling D-12 (operator markers): marker changes are kept and recovered by the
           # LXMF-rs custody outbox (lxmf-runtime LocalPropagation), whose store types live here.
-          "lxmf-propagation"}
+          "lxmf-propagation",
+          # The LXMF delivery announce encoder (display name and capabilities) RCH reads.
+          "lxmf-wire"}
 
 meta = json.loads(subprocess.check_output(
     ["cargo", "metadata", "--format-version", "1", "--no-deps", ]))
