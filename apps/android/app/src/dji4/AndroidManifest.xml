@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- DJI SDK registration needs the network; it runs only when a djiApiKey is built in. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- DJI SDK 4 touches Bluetooth while opening the controller's USB link; up to Android 11 that
+         needs these install-time permissions ("aoa connect error Need BLUETOOTH permission" on a Galaxy S8). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
 
     <application>
         <!-- Supplied from the djiApiKey Gradle property; empty by default. -->

@@ -11,6 +11,7 @@ import org.r3akt.uas.bridge.publishStart
 import org.r3akt.uas.bridge.publishStatus
 import org.r3akt.uas.bridge.publishStop
 import org.r3akt.uas.hud.HudState
+import org.r3akt.uas.hud.HudView
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -18,7 +19,7 @@ import java.util.concurrent.Executors
  * Test builds only (D-4, D-18): [inner] published to the RCH hub named by the Gradle properties
  * `r3aktHubAddress` and `r3aktHubDestination`, optionally in the RCH team `r3aktTeamUid`. Publishing
  * starts on the operator's tap in the session log and stops when the cockpit activity pauses (D-16);
- * while it runs, the same button opens the operator-marker panel.
+ * while it runs, the same button opens the operator-marker list and a tap on the aim cross places a marker.
  * Each flavour has its own [storeName], so its identity, aircraft and markers stay its own.
  * The app reports "sent", never "accepted": it cannot read the hub's results (G-17).
  *
@@ -61,8 +62,14 @@ class PublishingSource(
     }
 
     override fun logAction(): Pair<String, (Activity) -> Unit> =
-        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, worker, cameraPose?.let { { pose(it) } }).show() }
+        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, worker).show() }
         else "START PUBLISH" to { _ -> startPublishing() }
+
+    // Markers are stored by the publisher, so placing one needs publishing on.
+    override fun aimAction(): (Activity, HudView) -> Unit = { activity, hud ->
+        if (publishing) AimMarkerPanel(activity, hud, worker, cameraPose?.let { { pose(it) } }).show()
+        else hud.alert = "NO MARKER · PUBLISHING OFF" to "Open LOG, tap START PUBLISH"
+    }
 
     // The pose that belongs to the last offered fix, stamped with that fix's time.
     private fun pose(provider: (UInt, TelemetrySample) -> CameraPose): CameraPose? =

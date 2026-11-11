@@ -2,6 +2,8 @@ package org.r3akt.uas.dji4
 
 import android.content.Context
 import android.graphics.SurfaceTexture
+import android.media.MediaCodecList
+import android.media.MediaFormat
 import android.os.SystemClock
 import android.view.TextureView
 import dji.sdk.camera.VideoFeeder
@@ -33,6 +35,7 @@ class Dji4VideoView(context: Context) : TextureView(context), TextureView.Surfac
         // inside the SDK and keeps decoding, so every extra one adds to the phone's load.
         release()
         val created = DJICodecManager(context, surface, width, height)
+        softwareDecoder?.let(created::setCodecName)
         codec = created
         current = created
         VideoFeeder.getInstance()?.primaryVideoFeed?.addVideoDataListener(listener)
@@ -63,6 +66,14 @@ class Dji4VideoView(context: Context) : TextureView(context), TextureView.Surfac
         private var lastBytes = 0L
         private var lastPackets = 0L
 
+        // DJI SDK 4.18 falls back to software decoding only on the Pixel 6 (raven, oriole). Other
+        // phones whose default H.264 decoder is the Exynos one (Pixel 7) decode no frames: issue #9.
+        private val softwareDecoder: String? by lazy {
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 1440, 1088)
+            val default = MediaCodecList(MediaCodecList.REGULAR_CODECS).findDecoderForFormat(format)
+            if (default?.startsWith("c2.exynos") == true) "c2.android.avc.decoder" else null
+        }
+
         /** Destroys a decoder left behind by an earlier view. */
         private fun release() {
             current?.let {
@@ -87,8 +98,9 @@ class Dji4VideoView(context: Context) : TextureView(context), TextureView.Surfac
             val c = current ?: return "Video: no decoder, feed %.0f kbit/s".format(kbps)
             val size = runCatching { "${c.videoWidth}x${c.videoHeight}" }.getOrDefault("-")
             val ok = runCatching { c.isDecoderOK }.getOrNull()
-            return "Video: feed %.0f kbit/s, %.0f packets/s, decoder %s, %s".format(
-                kbps, pps, when (ok) { true -> "ok"; false -> "NOT OK"; null -> "-" }, size,
+            return "Video: feed %.0f kbit/s, %.0f packets/s, decoder %s%s, %s".format(
+                kbps, pps, when (ok) { true -> "ok"; false -> "NOT OK"; null -> "-" },
+                if (softwareDecoder != null) " (software)" else "", size,
             )
         }
     }

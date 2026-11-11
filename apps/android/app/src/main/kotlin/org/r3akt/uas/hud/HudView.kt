@@ -41,6 +41,18 @@ class HudView(context: Context) : ViewGroup(context) {
     var onLog: () -> Unit = {}
     var onAction: (FlightAction) -> Unit = {}
 
+    /** Tap on the aim cross; null when this source cannot place markers. */
+    var onAim: (() -> Unit)? = null
+        set(value) { field = value; applyState() }
+
+    /** The marker being named at the aim cross, as (name, colour); drawn until placed or cancelled. */
+    var aimMarker: Pair<String, Int>? = null
+        set(value) { field = value; invalidate() }
+
+    /** The HUD scale and the screen y of the design's line [dy], for overlays laid out on the same grid. */
+    val unit get() = s
+    fun screenY(dy: Float) = y(dy)
+
     private val label = resources.getFont(R.font.rajdhani_bold)
     private val mono = resources.getFont(R.font.b612mono_bold)
 
@@ -73,9 +85,13 @@ class HudView(context: Context) : ViewGroup(context) {
     private val slider = HudSlider(context, { s }, label)
     private val cancel = button(null, "CANCEL")
     private val dismiss = button(Hud.close, bare = true).apply { contentDescription = "Dismiss error" }
+    // Invisible: the reticle is drawn below; this only takes the tap.
+    private val aim = View(context).apply { contentDescription = "Place a marker at the aim cross"; isFocusable = true }
 
     init {
         setWillNotDraw(false)
+        // First, so every other control drawn over the reticle area keeps its taps.
+        add(aim, 381f, 206f, 198f, 128f, Anchor.CENTER)
         add(back, 0f, 0f, 44f, 40f, Anchor.LEFT)
         add(settings, 916f, 0f, 44f, 40f, Anchor.RIGHT)
         add(flight, 12f, 132f, 60f, 60f, Anchor.LEFT)
@@ -99,6 +115,7 @@ class HudView(context: Context) : ViewGroup(context) {
         slider.onConfirm = { pending?.let { pending = null; applyState(); onAction(it) } }
         cancel.setOnClickListener { pending = null; applyState() }
         dismiss.setOnClickListener { alert = null }
+        aim.setOnClickListener { onAim?.invoke() }
         flight.setOnClickListener { flightOpen = !flightOpen; applyState() }
         menu.setOnClickListener { menuOpen = !menuOpen; applyState() }
         applyState()
@@ -126,6 +143,7 @@ class HudView(context: Context) : ViewGroup(context) {
         slider.visibility = if (confirm != null) VISIBLE else GONE
         cancel.visibility = slider.visibility
         dismiss.visibility = if (alert != null) VISIBLE else GONE
+        aim.visibility = if (onAim != null && confirm == null) VISIBLE else GONE
 
         flight.icon = if (flightOpen) Hud.close else Hud.aircraft
         flight.label = if (st.rthActive) "RTH ON" else "FLIGHT"
@@ -485,6 +503,16 @@ class HudView(context: Context) : ViewGroup(context) {
             val by = cy + sy * 64 * s
             stroke(c, bx, by, bx - sx * 20 * s, by, Hud.GREEN)
             stroke(c, bx, by, bx, by - sy * 20 * s, Hud.GREEN)
+        }
+        aimMarker?.let { (name, color) ->
+            // The pending marker: a diamond on the cross, its name below, both until placed.
+            path.reset()
+            path.moveTo(cx, cy - 9 * s); path.lineTo(cx + 9 * s, cy); path.lineTo(cx, cy + 9 * s); path.lineTo(cx - 9 * s, cy); path.close()
+            fill.color = color
+            c.drawPath(path, fill)
+            line.color = Hud.WHITE; line.strokeWidth = 2f * s
+            c.drawPath(path, line)
+            write(c, "$name ?", cx, cy + 50 * s, 12f, Hud.AMBER, align = Paint.Align.CENTER)
         }
     }
 

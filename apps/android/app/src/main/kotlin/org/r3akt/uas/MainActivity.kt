@@ -58,6 +58,7 @@ class MainActivity : Activity() {
         hud = HudView(this)
         hud.onBack = { finish() }
         hud.onLog = ::showReport
+        hud.onAim = Variant.source.aimAction()?.let { action -> { action(this, hud) } }
         // Sent once, on the tap; a rejection is shown and never queued or retried (UAS-FLT-004, UAS-FLT-005).
         hud.onAction = { action ->
             Variant.source.perform(action) { error ->
