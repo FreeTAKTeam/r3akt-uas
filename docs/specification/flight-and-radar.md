@@ -1,6 +1,6 @@
 # Flight application, radar and observations
 
-Status: DJI connection, live cockpit values, take-off, landing, RTH, photo and video preview are **implemented but unproven** (no aircraft tested; see the milestone 4 record in [acceptance.md](acceptance.md)). Radar contacts, observations, recording, camera mode and gimbal control are specified, not implemented. Source: [PLAN.md](../goals/bootstrap/PLAN.md), section 3.
+Status: DJI connection, live cockpit values, take-off, landing, RTH, photo and video preview are **implemented but unproven** (no aircraft tested; see the milestone 4 record in [acceptance.md](acceptance.md)). The radar page with contacts, range selection, overlap selection and details, and the observations page (the app's own markers), are implemented but unproven (simulator and emulator only). Detection, recording, camera mode, gimbal control and contact revocation are specified, not implemented. Source: [PLAN.md](../goals/bootstrap/PLAN.md), section 3.
 
 ## Flight application
 
