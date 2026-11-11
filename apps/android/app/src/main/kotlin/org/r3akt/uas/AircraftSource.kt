@@ -37,6 +37,9 @@ interface AircraftSource {
     /** Contacts for the radar and the map; empty when this source has none. */
     fun contacts(): List<Contact> = emptyList()
 
+    /** The app's own operator markers (publish builds only); null when this build does not publish. */
+    fun markerOps(): MarkerOps? = null
+
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null
 }
