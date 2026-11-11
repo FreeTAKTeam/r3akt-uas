@@ -31,6 +31,9 @@ interface AircraftSource {
     /** An extra button in the session log as (label, action on the cockpit activity), or null for none. */
     fun logAction(): Pair<String, (android.app.Activity) -> Unit>? = null
 
+    /** What a tap on the aim cross does, on the cockpit activity and its HUD; null when markers are not offered. */
+    fun aimAction(): ((android.app.Activity, org.r3akt.uas.hud.HudView) -> Unit)? = null
+
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null
 }
