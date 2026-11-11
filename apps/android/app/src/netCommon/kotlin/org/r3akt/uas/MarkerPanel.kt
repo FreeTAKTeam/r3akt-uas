@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.view.View
 import android.widget.Button
+import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.NumberPicker
@@ -15,6 +16,7 @@ import org.r3akt.uas.bridge.CameraPose
 import org.r3akt.uas.bridge.OwnMarker
 import org.r3akt.uas.bridge.markerCreate
 import org.r3akt.uas.bridge.markerCreateAtCamera
+import org.r3akt.uas.bridge.markerCreateAtOffset
 import org.r3akt.uas.bridge.markerDelete
 import org.r3akt.uas.bridge.markerList
 import org.r3akt.uas.bridge.markerMove
@@ -75,6 +77,38 @@ class MarkerPanel(
                     isSingleLine = true
                 }
                 addView(nameField)
+                // Range and true bearing from the aircraft, chosen by the operator.
+                val range = EditText(activity).apply {
+                    hint = "range m"
+                    setText("500")
+                    setEms(4)
+                    inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                }
+                val bearing = EditText(activity).apply {
+                    hint = "bearing °"
+                    setText("0")
+                    setEms(3)
+                    inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                }
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(range)
+                    addView(bearing)
+                    addView(Button(activity).apply {
+                        text = "AT OFFSET"
+                        setOnClickListener {
+                            val base = names[name.value]
+                            val typed = typedName()
+                            val chosen = affiliations[affiliation.value]
+                            val metres = range.text.toString().toDoubleOrNull()
+                            val degrees = bearing.text.toString().toDoubleOrNull()
+                            run("placed") {
+                                if (metres == null || degrees == null) error("enter a range in metres and a bearing in degrees")
+                                markerCreateAtOffset(typed ?: nextName(base), chosen, degrees, metres).name
+                            }
+                        }
+                    })
+                })
                 addView(Button(activity).apply {
                     text = "PLACE AT CAMERA"
                     setOnClickListener {
@@ -94,7 +128,7 @@ class MarkerPanel(
         }
         dialog = AlertDialog.Builder(activity)
             .setTitle("Operator markers")
-            .setView(body)
+            .setView(ScrollView(activity).apply { addView(body) })
             .setPositiveButton("PLACE AT AIRCRAFT", null)
             .setNeutralButton("RESEND LAST FIX") { _, _ -> publishResendLastFix() }
             .setNegativeButton("CLOSE", null)

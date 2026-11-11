@@ -71,6 +71,14 @@ Recorded 10 November 2026 for branch `feat/dji-net`; plan: [DJI field-trial buil
 
 The marker panel gains a name field: a typed name replaces the picked Alpha–Zulu name, as D-11 asked ("name Alpha–Zulu with a counter, editable"). On the owner's request, the Pixel's `simNet` build placed a hostile marker "Putin 666" on the R3AKT Server. It sits at the simulated aircraft position with the notes "SIMULATED · at aircraft position", and the report then showed "operator markers waiting for the hub: 0". Afterwards, publishing was stopped and `dji4Net` reinstalled.
 
+## Placement at an operator offset
+
+- **New call:** `marker_create_at_offset(name, affiliation, bearing_deg, range_m)` places a marker at a range and true bearing from the aircraft's position. The point comes from the shared great-circle `r3akt_map_core::sensor_geometry::destination`, public since RCH #317. The range must be above 0 and at most 5 km, the radar's largest range.
+- **Notes:** the marker says `500 m at 000° true from aircraft position (operator offset)`, with `SIMULATED · ` first when the source is simulated. The offset is the operator's choice, not a measurement.
+- **Host test:** 500 m north lands within 0.5 m of 500 m; zero, beyond 5 km and NaN are refused.
+- **Panel:** range (default 500 m) and bearing (default 0°) fields with AT OFFSET. The panel now scrolls in landscape.
+- **On the owner's request:** the Pixel's `simNet` build, connected to the R3AKT Server, placed the hostile marker "Putin 666" 500 m north of the simulated aircraft, at 45.004215, 6.997488 (object `376432932dff55d1fa285f3c1c26c067`). It is delivered to the hub's LXMF: 0 waiting. RCH shows it only if the simNet identity `8db22674…` has `mission.content.write` and is in team BLUE on that hub; the earlier "Putin 666" at the aircraft position is not shown there for that reason.
+
 ## Not yet shown
 
 The ground test (task 4) and the flight test (task 5) need the owner, a Mavic Air 2 or Air 2S with the RC-N1, and the hub reachable from the field (D-17). Until then everything from the aircraft onwards is implemented but unproven:

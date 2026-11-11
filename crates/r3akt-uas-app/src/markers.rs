@@ -226,6 +226,62 @@ pub fn marker_create_at_camera(
     Ok(OwnMarker::from(&record))
 }
 
+/// Farthest offset placement: the radar's largest range (UAS-PRD-005).
+const MAX_OFFSET_M: f64 = 5_000.0;
+
+/// Places a marker at a range and true bearing chosen by the operator from the aircraft's
+/// position, through the shared great-circle `sensor_geometry::destination`. The notes say
+/// so: the offset is the operator's choice, not a measurement.
+///
+/// # Errors
+/// As [`marker_create`], or a range outside 0 to 5 km or a non-finite bearing.
+#[uniffi::export]
+pub fn marker_create_at_offset(
+    name: &str,
+    affiliation: Affiliation,
+    bearing_deg: f64,
+    range_m: f64,
+) -> Result<OwnMarker, PublishError> {
+    let (dir, fix) = placement()?;
+    let position = offset_position(&fix, bearing_deg, range_m).map_err(refused)?;
+    let mut record = new_record(
+        name,
+        affiliation,
+        position.lat(),
+        position.lon(),
+        fix.simulated,
+        now_ms(),
+    )
+    .map_err(refused)?;
+    record.notes = Some(offset_note(fix.simulated, bearing_deg, range_m));
+    submit_marker(Change::Create, record.clone()).map_err(refused)?;
+    save(&dir, &record).map_err(refused)?;
+    Ok(OwnMarker::from(&record))
+}
+
+pub(crate) fn offset_position(
+    fix: &crate::telemetry::TelemetrySample,
+    bearing_deg: f64,
+    range_m: f64,
+) -> Result<Position, String> {
+    if !(range_m > 0.0 && range_m <= MAX_OFFSET_M) {
+        return Err(format!(
+            "range must be above 0 and at most {MAX_OFFSET_M} m"
+        ));
+    }
+    let origin = Position::new(fix.latitude_deg, fix.longitude_deg).map_err(|e| e.to_string())?;
+    r3akt_map_core::sensor_geometry::destination(origin, bearing_deg, range_m)
+        .map_err(str::to_owned)
+}
+
+pub(crate) fn offset_note(simulated: bool, bearing_deg: f64, range_m: f64) -> String {
+    format!(
+        "{}{range_m:.0} m at {:03.0}° true from aircraft position (operator offset)",
+        if simulated { "SIMULATED · " } else { "" },
+        bearing_deg.rem_euclid(360.0),
+    )
+}
+
 pub(crate) fn camera_note(
     simulated: bool,
     point: &r3akt_map_core::camera_ground::GroundPoint,
@@ -389,6 +445,22 @@ mod tests {
             note.contains("flat ground") && note.ends_with("200 m from aircraft"),
             "{note}"
         );
+    }
+
+    #[test]
+    fn offset_marker_is_500_m_away_and_says_so() {
+        let fix = crate::sim::sample(0);
+        let p = offset_position(&fix, 0.0, 500.0).unwrap();
+        let north_m = (p.lat() - fix.latitude_deg).to_radians() * 6_371_008.8;
+        assert!((north_m - 500.0).abs() < 0.5, "{north_m}");
+        assert!((p.lon() - fix.longitude_deg).abs() < 1e-9);
+        assert_eq!(
+            offset_note(true, 0.0, 500.0),
+            "SIMULATED · 500 m at 000° true from aircraft position (operator offset)"
+        );
+        assert!(offset_position(&fix, 0.0, 0.0).is_err());
+        assert!(offset_position(&fix, 0.0, 5_001.0).is_err());
+        assert!(offset_position(&fix, f64::NAN, 500.0).is_err());
     }
 
     #[test]
