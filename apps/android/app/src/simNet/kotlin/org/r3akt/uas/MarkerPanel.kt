@@ -10,8 +10,10 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import org.r3akt.uas.bridge.Affiliation
+import org.r3akt.uas.bridge.CameraPose
 import org.r3akt.uas.bridge.OwnMarker
 import org.r3akt.uas.bridge.markerCreate
+import org.r3akt.uas.bridge.markerCreateAtCamera
 import org.r3akt.uas.bridge.markerDelete
 import org.r3akt.uas.bridge.markerList
 import org.r3akt.uas.bridge.markerMove
@@ -20,13 +22,19 @@ import org.r3akt.uas.bridge.publishStatus
 import java.util.concurrent.Executor
 
 /**
- * Operator markers (test build): place a marker at the aircraft's position, then move or
- * delete the app's own markers. The pickers follow the FreeTAKUAS GeoObject popup
+ * Operator markers (test build): place a marker at the aircraft's position or where the
+ * camera centre meets the ground (shared ground point, refused when it is not valid), then
+ * move or delete the app's own markers. The pickers follow the FreeTAKUAS GeoObject popup
  * (affiliation and an Alpha–Zulu name with a counter; FreeTAKUAS 704f4aa, MIT).
  * Every bridge call runs on [worker]: it may wait for the publisher.
- * The list shows the last **sent** state; it is never the hub's state.
+ * The list shows the last change made here and how many are still stored; never the hub's state.
  */
-class MarkerPanel(private val activity: Activity, private val worker: Executor) {
+class MarkerPanel(
+    private val activity: Activity,
+    private val worker: Executor,
+    /** The camera pose now, read on the tap so it matches the aircraft fix. */
+    private val cameraPose: () -> CameraPose,
+) {
     private val affiliations = Affiliation.entries.toTypedArray()
     private val names = arrayOf(
         "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett",
@@ -56,7 +64,22 @@ class MarkerPanel(private val activity: Activity, private val worker: Executor) 
         val body = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(32, 16, 32, 16)
-            addView(pickers)
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(pickers)
+                addView(Button(activity).apply {
+                    text = "PLACE AT CAMERA"
+                    setOnClickListener {
+                        val pose = cameraPose()
+                        val base = names[name.value]
+                        val chosen = affiliations[affiliation.value]
+                        run("placed") {
+                            val count = markerList().count { it.name.startsWith("$base-") } + 1
+                            markerCreateAtCamera("$base-$count", chosen, pose).name
+                        }
+                    }
+                })
+            })
             addView(markers, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         }
         dialog = AlertDialog.Builder(activity)

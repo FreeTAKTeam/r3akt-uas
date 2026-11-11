@@ -195,6 +195,54 @@ pub fn marker_create(name: &str, affiliation: Affiliation) -> Result<OwnMarker, 
     Ok(OwnMarker::from(&record))
 }
 
+/// Places a marker where the camera centre meets the ground (mode D-10 (c)), with the
+/// shared ground point (RCH #313). The bound and ground model go in the notes until a
+/// shared field carries them. Refused, never estimated, when the geometry is not valid.
+///
+/// # Errors
+/// As [`marker_create`], or the reason the camera point cannot be placed.
+#[uniffi::export]
+pub fn marker_create_at_camera(
+    name: &str,
+    affiliation: Affiliation,
+    pose: crate::camera::CameraPose,
+) -> Result<OwnMarker, PublishError> {
+    let (dir, fix) = placement()?;
+    let now = now_ms();
+    let point = crate::camera::camera_point(&fix, &pose, u64::try_from(now).unwrap_or(0))
+        .map_err(|e| refused(format!("no camera point: {e}")))?;
+    let mut record = new_record(
+        name,
+        affiliation,
+        point.position.lat(),
+        point.position.lon(),
+        fix.simulated,
+        now,
+    )
+    .map_err(refused)?;
+    record.notes = Some(camera_note(fix.simulated, &point));
+    submit_marker(Change::Create, record.clone()).map_err(refused)?;
+    save(&dir, &record).map_err(refused)?;
+    Ok(OwnMarker::from(&record))
+}
+
+pub(crate) fn camera_note(
+    simulated: bool,
+    point: &r3akt_map_core::camera_ground::GroundPoint,
+) -> String {
+    use r3akt_map_core::camera_ground::GroundModel;
+    let ground = match point.ground {
+        GroundModel::Flat { .. } => "flat ground",
+        GroundModel::TakeoffRelative { .. } => "flat ground at take-off height",
+    };
+    format!(
+        "{}camera point ±{:.0} m (bound, {ground}), {:.0} m from aircraft",
+        if simulated { "SIMULATED · " } else { "" },
+        point.uncertainty_radius_m.ceil(),
+        point.ground_range_m,
+    )
+}
+
 /// Moves one of the app's markers to the aircraft's current position.
 ///
 /// # Errors
@@ -325,6 +373,22 @@ mod tests {
                 .unwrap();
         assert_eq!(keys.as_object().unwrap().keys().collect::<Vec<_>>(), ["9"]);
         assert_eq!(a[0].command_id, b[0].command_id);
+    }
+
+    #[test]
+    fn camera_note_carries_the_bound_and_ground_model() {
+        let point = crate::camera::camera_point(
+            &crate::sim::sample(10),
+            &crate::sim::camera(10),
+            (crate::sim::START_TIME_S + 10) * 1000,
+        )
+        .unwrap();
+        let note = camera_note(true, &point);
+        assert!(note.starts_with("SIMULATED · camera point ±"), "{note}");
+        assert!(
+            note.contains("flat ground") && note.ends_with("200 m from aircraft"),
+            "{note}"
+        );
     }
 
     #[test]

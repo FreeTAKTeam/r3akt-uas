@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import org.r3akt.uas.bridge.PublishState
+import org.r3akt.uas.bridge.camera
 import org.r3akt.uas.bridge.publishOfferFix
 import org.r3akt.uas.bridge.publishStart
 import org.r3akt.uas.bridge.publishStatus
@@ -31,6 +32,8 @@ class PublishingSimulator : SimulatorSource() {
     private lateinit var storeDir: String
     @Volatile private var publishing = false
     @Volatile private var startError: String? = null
+    @Volatile private var lastSeq = 0u
+    @Volatile private var lastFixS = 0uL
     // Start and stop run here, in order: stop can block for one send's path wait (POST F1).
     private val worker = Executors.newSingleThreadExecutor()
 
@@ -49,7 +52,7 @@ class PublishingSimulator : SimulatorSource() {
 
     // Leaving the cockpit stops publishing; while it runs, the button opens the operator-marker panel.
     override fun logAction(): Pair<String, (Activity) -> Unit> =
-        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, worker).show() }
+        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, worker, ::cameraPose).show() }
         else "START PUBLISH" to { _ -> startPublishing() }
 
     private fun startPublishing() {
@@ -73,10 +76,15 @@ class PublishingSimulator : SimulatorSource() {
         if (!publishing) return state
         // The orbit's shape with wall-clock time: the hub ignores old and far-future fixes.
         val now = (System.currentTimeMillis() / 1000).toULong()
+        lastSeq = seq
+        lastFixS = now
         publishOfferFix(sample(seq).copy(sampleTimeS = now, fixTimeS = now))
         val status = publishStatus()
         return state.copy(status = "${state.status} · ${status.state.name} ${status.fixesSent}")
     }
+
+    // The simulated pose of the last offered fix's sample, stamped with that fix's time.
+    private fun cameraPose() = camera(lastSeq).copy(sampleTimeMs = lastFixS * 1000u)
 
     override fun publicationReport(): String {
         val s = publishStatus()

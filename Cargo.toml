@@ -12,10 +12,10 @@ publish = false
 # Shared R3AKT libraries, pinned to the inspected baselines in docs/goals/bootstrap/PLAN.md.
 # Do not replace these with local implementations (see AGENTS.md).
 [workspace.dependencies]
-r3akt-map-core = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "83b5d64aac69347c997ac9e88d84242eb87a1814" }
+r3akt-map-core = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "d7ad6e17719baf0ea7221343c0cd8beb8ab806ab" }
 # Milestone 2a publication path, used only behind r3akt-uas-app's `publish` feature.
-# One LXMF-rs revision: the one RCH 83b5d64a pins (D-5, re-pinned for operator markers, D-13).
-r3akt-profile-rch = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "83b5d64aac69347c997ac9e88d84242eb87a1814" }
+# One LXMF-rs revision: the one RCH d7ad6e17 pins (D-5; re-pinned for operator markers, D-13, and the camera ground point, RCH #313).
+r3akt-profile-rch = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "d7ad6e17719baf0ea7221343c0cd8beb8ab806ab" }
 lxmf-sdk = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1", default-features = false, features = ["std"] }
 lxmf-runtime = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }
 reticulum-rs-transport = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }

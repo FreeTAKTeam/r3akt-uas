@@ -10,6 +10,7 @@ uniffi::setup_scaffolding!();
 
 #[cfg(feature = "publish")]
 pub mod aircraft;
+pub mod camera;
 pub mod dji;
 #[cfg(feature = "publish")]
 pub mod identity;

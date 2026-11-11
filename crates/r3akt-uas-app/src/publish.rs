@@ -9,6 +9,7 @@ use std::sync::mpsc::{RecvTimeoutError, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::camera::origin_position;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use lxmf_propagation::{MessageKind, StoreLimits};
@@ -17,7 +18,6 @@ use lxmf_runtime::{
     InProcessBackendConfig, LocalPropagation, PropagationRouteLimits,
 };
 use lxmf_sdk::{SdkBackend, SendRequest};
-use r3akt_map_core::sensor::{AltitudeDatum, OriginPosition};
 use r3akt_map_core::sensor_wire::{OriginFixEvent, SensorEvent, encode_object_fields};
 use r3akt_profile_rch::{EventEnvelope, RchSource, encode_events};
 use rns_transport::destination::{DestinationName, SingleInputDestination};
@@ -30,7 +30,7 @@ use rns_transport::transport::{Transport, TransportConfig};
 use crate::aircraft::create_command;
 use crate::identity::AppIdentity;
 use crate::markers::{self, Change};
-use crate::telemetry::{AltitudeReference, TelemetrySample};
+use crate::telemetry::TelemetrySample;
 use r3akt_map_core::MarkerRecord;
 
 #[derive(Debug, thiserror::Error)]
@@ -74,26 +74,6 @@ pub fn fix_message(
         .map_err(|error| FixError::Encode(error.to_string()))?;
     envelope.source = Some(RchSource::new(identity.destination_hash()));
     encode_events(&[envelope]).map_err(|error| FixError::Encode(error.to_string()))
-}
-
-fn origin_position(sample: &TelemetrySample) -> OriginPosition {
-    // Take-off-relative and unknown altitudes have no datum; they stay absent (G-07).
-    let datum = match sample.altitude_reference {
-        AltitudeReference::Msl => Some(AltitudeDatum::Msl),
-        AltitudeReference::Hae => Some(AltitudeDatum::Hae),
-        AltitudeReference::Agl => Some(AltitudeDatum::Agl),
-        AltitudeReference::TakeoffRelative | AltitudeReference::Unknown => None,
-    };
-    OriginPosition {
-        lat: sample.latitude_deg,
-        lon: sample.longitude_deg,
-        alt_m: datum.map(|_| sample.altitude_m),
-        altitude_datum: datum.unwrap_or_default(),
-        fix_at_ms: sample.fix_time_s.saturating_mul(1000),
-        speed_mps: Some(sample.ground_speed_mps),
-        course_deg: Some(sample.course_deg),
-        accuracy_m: Some(sample.horizontal_accuracy_m),
-    }
 }
 
 // ---- Publisher worker (task 5, R-2: construction only) ----------------------
@@ -186,7 +166,19 @@ pub fn publish_start(
     team_uid: Option<String>,
 ) -> Result<(), PublishError> {
     let hub = hex32(hub_destination, "hub destination")?;
-    let team = team_uid.map(|t| hex32(&t, "team UID")).transpose()?;
+    let team = team_uid
+        .map(|t| hex32(&t, "team UID"))
+        .transpose()?
+        .map(|t| {
+            if r3akt_profile_rch::teams::is_canonical_team_uid(&t) {
+                Ok(t)
+            } else {
+                Err(PublishError::Config {
+                    reason: format!("team UID {t} is not an RCH canonical team"),
+                })
+            }
+        })
+        .transpose()?;
     let mut worker = WORKER
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -245,8 +237,7 @@ const STATUS_STOPPED: PublishStatus = PublishStatus {
     markers_pending: 0,
 };
 
-/// Lower-cases a 32-hex hash. RCH matches team UIDs byte for byte against its
-/// lower-case canonical list, which stays the hub's (it is not a shared crate).
+/// Lower-cases a 32-hex hash; RCH matches hashes and team UIDs in lower case.
 fn hex32(value: &str, what: &str) -> Result<String, PublishError> {
     let value = value.trim().to_ascii_lowercase();
     if value.len() == 32 && value.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -654,6 +645,8 @@ fn record_send(result: Result<(), String>, sample: &TelemetrySample) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::telemetry::AltitudeReference;
+    use r3akt_map_core::sensor::{AltitudeDatum, OriginPosition};
     use r3akt_map_core::sensor_frame;
 
     fn sample(reference: AltitudeReference) -> TelemetrySample {
@@ -736,6 +729,19 @@ mod tests {
         };
         assert_eq!(keys(&with_team), ["11", "13", "3"]);
         assert_eq!(keys(&without), ["13"]);
+    }
+
+    #[test]
+    fn non_canonical_team_is_refused_before_starting() {
+        let err = publish_start(
+            String::new(),
+            "127.0.0.1:1".to_owned(),
+            BLUE,
+            Some("00112233445566778899aabbccddeeff".to_owned()),
+        );
+        assert!(
+            matches!(err, Err(PublishError::Config { reason }) if reason.contains("canonical"))
+        );
     }
 
     #[test]
