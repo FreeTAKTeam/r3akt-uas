@@ -1,6 +1,6 @@
 # DJI field-trial build (`dji4Net`) — task plan (revision 2)
 
-Status: **the focused PRE on revision 1 returned blocked (D-4, shared identity). Every engineering finding is applied here ([PRE record](../../integration/pre-review.md)); owner decisions D-14 to D-18 are open.** Owner direction (10 November 2026): be able to try the app with a real drone. Milestone 3's operator markers (merged in PR #6) are proven with the simulator only. Milestone 4 (DJI flight) has not passed: no aircraft or valid key has been used.
+Status: **the focused PRE on revision 1 returned blocked (D-4, shared identity). Every engineering finding is applied here ([PRE record](../../integration/pre-review.md)). The owner ruled on D-14 to D-18 on 10 November 2026, which clears both blockers; task 1 may start.** Owner direction (10 November 2026): be able to try the app with a real drone. Milestone 3's operator markers (merged in PR #6) are proven with the simulator only. Milestone 4 (DJI flight) has not passed: no aircraft or valid key has been used.
 
 **Intent:** the same publisher and marker panel as `simNet`, fed by a real DJI SDK 4 aircraft. A pilot on a field trial then shows up in RCH and REM and places markers from the flight app.
 **Expected outcome:**
@@ -60,9 +60,11 @@ Status: **the focused PRE on revision 1 returned blocked (D-4, shared identity).
   - `beforeVariants` enables {`simNet`, `dji4Net`} in a publish build and {`sim`, `dji4`} otherwise.
 - **Lifecycle:** `simNet` stops publishing when the cockpit is paused (screen off, another app). On a field trial that would drop the aircraft from the network mid-flight, while the flight itself continues (UAS-FLT-003 holds either way). The hook fires on every activity's pause, and DJI's USB accessory activity opens when the remote controller is plugged in. A controller reconnect would therefore stop publishing silently (PRE #6). The stop must apply to the cockpit activity only.
 
-## Decisions (owner)
+## Decisions (owner, 10 November 2026)
 
-| ID | Decision | Proposal |
+Rulings: D-14 Mavic Air 2 or Air 2S with the RC-N1, key supplied by the owner; D-15 (a); D-16 as proposed; D-17 as proposed; D-18 approved.
+
+| ID | Decision | Proposal (ruled as above) |
 |---|---|---|
 | D-14 | Aircraft and key | The owner names the aircraft and remote controller. They must be DJI Mobile SDK 4 products (for example the Mavic 2 or Phantom 4 series, or the Mavic Air 2). The owner also provides an app key for `org.r3akt.uas` in `~/.gradle/gradle.properties`. |
 | D-15 | Camera point on DJI | **(a) Recommended for the first trial:** the camera point is refused on DJI with "no position accuracy from DJI"; markers go at the aircraft position. A DJI fix also needs a minimum GPS signal level, which DJI reports as level 0 to 5 (proposal: level 3 or better); below that the fix is not sent. Task 4 records DJI's gimbal yaw meaning and the values the aircraft reports. (b) Later: a reviewed per-model table of DJI's published accuracy figures, with sources cited, as the bound. |
@@ -99,4 +101,5 @@ Status: **the focused PRE on revision 1 returned blocked (D-4, shared identity).
 
 - **Device-dependent:** tasks 4 and 5 need the owner, the aircraft and the key. Until then everything is "implemented but unproven" on hardware.
 - **Altitude:** take-off-relative altitude reaches the network as unknown (G-07), so RCH and REM show no altitude for the aircraft.
+- **Aircraft (D-14):** Mavic Air 2 and Air 2S use DJI's newer video and remote-controller paths, and SDK 4 supports them only in later 4.x releases. The pinned `dji-sdk:4.18` must show the aircraft and video in task 4 before any compatibility claim is made.
 - **Not a release:** this is a debug test build, not the signed release of milestone 6. The hub settings are fixed at build time.
