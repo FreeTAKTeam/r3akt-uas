@@ -1,0 +1,25 @@
+# Display text (UAS-RAD-002, UAS-RAD-006): kind value expected_text
+# age: milliseconds before now ("-" unknown, negative = ahead of the clock); unknown is never 0.
+age - UNKNOWN
+age 0 0 s
+age 999 0 s
+age 59000 59 s
+age 119999 119 s
+age 120000 2 min
+age 7199999 119 min
+age 7200000 2 h
+age -1 AHEAD OF CLOCK
+# distance: ring labels and details.
+distance 125 125 m
+distance 500 500 m
+distance 1000 1 km
+distance 1250 1.25 km
+distance 2500 2.5 km
+distance 3750 3.75 km
+distance 5000 5 km
+# bearing: true, three digits.
+bearing 0 000°
+bearing 45.4 045°
+bearing 359.6 000°
+bearing -90 270°
+bearing 720 000°

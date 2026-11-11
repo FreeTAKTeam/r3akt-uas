@@ -1,0 +1,8 @@
+# Aged state (UAS-RAD-007): position_age_s|- reported|own aged|fresh
+# Reported contacts age after 120 s or with an unknown position time; the app's own markers never do.
+0 reported fresh
+120 reported fresh
+121 reported aged
+- reported aged
+3600 own fresh
+- own fresh

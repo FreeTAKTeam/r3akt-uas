@@ -86,6 +86,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    testOptions {
+        // Radar case files; an edited case reruns the tests.
+        val radarFixtures = rootDir.resolve("../../fixtures/radar")
+        unitTests.all {
+            it.inputs.dir(radarFixtures)
+            it.systemProperty("radar.fixtures", radarFixtures.canonicalPath)
+        }
+    }
 }
 
 // One build holds either the default variants (no publisher in the native library)
@@ -101,4 +109,5 @@ dependencies {
     implementation(project(":native-bridge"))
     "dji4Implementation"(project(":dji4"))
     "dji4NetImplementation"(project(":dji4"))
+    testImplementation(libs.junit)
 }

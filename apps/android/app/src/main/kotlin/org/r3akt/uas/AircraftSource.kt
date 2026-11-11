@@ -37,6 +37,9 @@ interface AircraftSource {
     /** Contacts for the radar and the map; empty when this source has none. */
     fun contacts(): List<Contact> = emptyList()
 
+    /** A long-press on an empty radar spot at (range m, true bearing) from the aircraft (D-10 (b)); null when markers are not offered. */
+    fun radarPick(): ((android.app.Activity, Double, Double) -> Unit)? = null
+
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null
 }

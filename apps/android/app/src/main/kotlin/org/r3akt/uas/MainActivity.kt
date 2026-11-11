@@ -41,6 +41,7 @@ class MainActivity : Activity() {
                 .getOrElse { HudState(status = "SOURCE ERROR", simulated = false) }
             // An unchanged state is not redrawn: the HUD shares the main thread with the video view.
             if (state != hud.state) hud.state = state
+            hud.contacts = runCatching { Variant.source.contacts() }.getOrDefault(emptyList())
             SessionLog.onState(state)
             page?.update(state)
             showVideo(state.video)

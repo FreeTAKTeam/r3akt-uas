@@ -1,0 +1,24 @@
+# Projection (UAS-RAD-001, UAS-RAD-008): range_m bearing_deg heading_deg|- max_range_m expect_x expect_y
+# Offsets on a radar of radius 1 from its centre, x right and y down (screen).
+# "-" is no aircraft heading: north-up, labelled as such on the page.
+
+# Cardinal directions, heading 0: north is up.
+500 0 0 500 0 -1
+500 90 0 500 1 0
+500 180 0 500 0 1
+500 270 0 500 -1 0
+
+# Heading 90: a contact due east is straight ahead, north is to the left.
+250 90 90 500 0 -0.5
+250 0 90 500 -0.5 0
+250 180 90 500 0.5 0
+
+# Heading wrap at 359 -> 0: contacts 2 degrees apart either side of the nose.
+1000 1 359 1000 0.0348995 -0.9993908
+1000 359 1 1000 -0.0348995 -0.9993908
+1000 0 360 1000 0 -1
+1000 0 -90 1000 1 0
+
+# No heading: north-up, contacts still at their true bearing.
+500 90 - 500 1 0
+500 0 - 1000 0 -0.5

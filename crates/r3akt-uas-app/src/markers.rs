@@ -40,6 +40,9 @@ pub struct OwnMarker {
     pub lat: f64,
     pub lon: f64,
     pub notes: Option<String>,
+    /// When the record last changed, epoch milliseconds (shared `updated_ts_ms`). This app
+    /// only creates and moves markers, so it is also when the position was set.
+    pub updated_ms: i64,
 }
 
 impl From<&MarkerRecord> for OwnMarker {
@@ -51,6 +54,7 @@ impl From<&MarkerRecord> for OwnMarker {
             lat: r.lat,
             lon: r.lon,
             notes: r.notes.clone(),
+            updated_ms: r.updated_ts_ms,
         }
     }
 }
@@ -477,6 +481,7 @@ mod tests {
             (got.lat, got.lon, got.notes.as_deref()),
             (45.1, 7.1, Some("at aircraft position"))
         );
+        assert_eq!(OwnMarker::from(&got).updated_ms, 2);
         assert_eq!(list(&dir).unwrap().len(), 1);
         remove(&dir, &rec.object_destination_hash).unwrap();
         assert!(list(&dir).unwrap().is_empty());

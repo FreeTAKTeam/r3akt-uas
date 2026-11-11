@@ -11,6 +11,7 @@ jna = "5.14.0"
 djiSdk = "4.18"
 appcompat = "1.6.1"
 constraintlayout = "2.1.4"
+junit = "4.13.2"
 
 [libraries]
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
@@ -19,6 +20,8 @@ dji-sdk = { module = "com.dji:dji-sdk", version.ref = "djiSdk" }
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 dji-sdk-provided = { module = "com.dji:dji-sdk-provided", version.ref = "djiSdk" }
+# JVM unit tests of the radar arithmetic against fixtures/radar/.
+junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
