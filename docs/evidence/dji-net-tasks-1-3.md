@@ -48,6 +48,16 @@ Recorded 10 November 2026 for branch `feat/dji-net`; plan: [DJI field-trial buil
 | `simNet` | Fixes went out at about 1 Hz (17 in about 15 s). PLACE AT CAMERA put Alpha-2 at the simulated target in REM, under the same identity as before. After leaving the cockpit and returning, the status read `IN FLIGHT · PUBLISH STOPPED` ([screenshot](dji-net-simnet-publish-stopped.png)). |
 | `dji4Net`, owner's key, no aircraft | DJI registration succeeded: "registered, waiting for an aircraft" ([screenshot](dji-net-pixel-registered-no-aircraft.png)). The app has its own identity, destination `84b40d98…`, separate from simNet's `8db22674…`. With no aircraft the hub received nothing from it (0 messages): no position was invented. PLACE AT AIRCRAFT was refused, "aircraft position unknown" ([screenshot](dji-net-pixel-marker-refused.png)), and PLACE AT CAMERA was refused, "no camera point from this aircraft source". |
 
+## Debug build against the R3AKT Server
+
+- **Hub:** REM's default "R3AKT Server" at `134.122.46.48:37428`, hub destination `c4de028671f01d9649aabb85e73b50a4`, team BLUE.
+- **Builds:** `simNet` and `dji4Net` were built for it, and the port is reachable.
+- **Simulator check from the Pixel:**
+  - result: hub connected; the aircraft create was sent; 40 fixes went to LXMF in about 40 s at 1 Hz;
+  - identity: the simNet identity `8db22674…`, labelled SIMULATED;
+  - after the check, publishing was stopped and `dji4Net` was reinstalled.
+- **Not verified:** whether that hub applied the fixes. That needs the hub operator to add the app destination to team BLUE and grant `mission.content.write` (`8db22674…` for simNet, `84b40d98…` for dji4Net). Without that, the hub does not show or relay the aircraft.
+
 ## Not yet shown
 
 The ground test (task 4) and the flight test (task 5) need the owner, a Mavic Air 2 or Air 2S with the RC-N1, and the hub reachable from the field (D-17). Until then everything from the aircraft onwards is implemented but unproven:
