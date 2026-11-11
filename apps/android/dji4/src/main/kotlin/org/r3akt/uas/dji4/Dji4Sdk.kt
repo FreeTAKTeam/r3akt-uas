@@ -239,6 +239,7 @@ object Dji4Sdk {
             if (s.link == Dji4Link.CONNECTED) {
                 append("\nGPS level ${s.gpsLevel ?: "-"}, satellites ${s.satellites ?: "-"}")
                 append("\nGimbal yaw ${s.gimbalYawDeg ?: "-"}, relative to heading ${s.gimbalYawRelativeDeg ?: "-"}")
+                append("\n").append(Dji4VideoView.report())
             }
         }
     }

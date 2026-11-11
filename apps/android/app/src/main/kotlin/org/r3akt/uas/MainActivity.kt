@@ -34,7 +34,8 @@ class MainActivity : Activity() {
         override fun run() {
             val state = runCatching { Variant.source.cockpit(seq++) }
                 .getOrElse { HudState(status = "SOURCE ERROR", simulated = false) }
-            hud.state = state
+            // An unchanged state is not redrawn: the HUD shares the main thread with the video view.
+            if (state != hud.state) hud.state = state
             showVideo(state.video)
             handler.postDelayed(this, Variant.source.periodMs)
         }
