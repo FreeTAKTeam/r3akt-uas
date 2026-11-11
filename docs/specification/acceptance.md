@@ -38,11 +38,11 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRD-003 | 4, 6 | Compatibility matrix with physically tested rows | specified |
 | UAS-PRD-004 | 4 | Hardware flight evidence per action | implemented but unproven (take-off, landing, RTH, photo, video preview); recording and gimbal control specified |
 | UAS-PRD-005 | 4 | Radar evidence (see Radar) | specified |
-| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | proven in scope (step 2a: RCH store and API, [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence; the map view at `c2bf78a` is blocked by G-20 and shown against RCH `cc6ca164`, [map evidence](../evidence/m2a-rch-map-cc6ca164.md)); REM: proven in scope for step 2b, appearance only — the aircraft appears once in REM `0cfa422` at the relayed position and does not follow it until REM #341 ([host](../evidence/m2b-task3-host-proof-rem.md), [Pixel 7](../evidence/m2b-task4-device-proof.md)) |
+| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | proven in scope (step 2a: RCH store and API, [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence; the map view at `c2bf78a` is blocked by G-20 and shown against RCH `cc6ca164`, [map evidence](../evidence/m2a-rch-map-cc6ca164.md)); REM: proven in scope for step 2b, appearance only — the aircraft appears once in REM `0cfa422` at the relayed position and does not follow it until REM #341 ([host](../evidence/m2b-task3-host-proof-rem.md), [Pixel 7](../evidence/m2b-task4-device-proof.md)); operator markers (milestone 3): proven in scope by team relay — create, move and delete from the Pixel 7 appear, move and disappear in REM `0cfa422` through RCH `83b5d64a` ([evidence](../evidence/m3-task5-markers-rem-proof.md)) |
 | UAS-PRD-007 | 5 | TCP and RNode operation evidence | specified |
 | UAS-PRD-008 | 5 | Detection promotion evidence | specified |
 | UAS-PRD-009 | 5 | MediaMTX playback evidence | specified |
-| UAS-PRD-010 | 5 | Offline/mesh evidence | specified |
+| UAS-PRD-010 | 3, 5 | Offline/mesh evidence (operator markers through the LXMF-rs custody outbox in milestone 3; constrained mesh in 5) | proven in scope for milestone 3 (a create and a move made on the Pixel 7 with the hub down were delivered once each to RCH and REM after it came back, [evidence](../evidence/m3-task5-markers-rem-proof.md); a delete during an outage is host-proven only, [outbox spike](../evidence/m3-task1-outbox-spike.md)); constrained mesh: specified |
 | UAS-PRD-011 | 1, 6 | EPL-2.0 `LICENSE`, `THIRD_PARTY_NOTICES.md` (1); signed APK (6) | scaffold-proven (licensing); signing specified |
 | UAS-PRD-012 | 2, 4 | No flight command path in RCH integration; review + tests | proven in scope (step 2a: the publisher has no receive path, G-17; POST review) |
 | UAS-ARC-001 | 1–5 | Architecture review at each milestone gate | specified |
@@ -64,7 +64,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRF-009 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | proven in scope (step 2a, RCH: position travels as the shared R3S origin fix; [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence); REM specified |
 | UAS-PRF-010 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | proven in scope (step 2a, RCH: origin fix on field 13 only, no field 2/3/11; [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence); REM specified |
 | UAS-PRF-011 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
-| UAS-PRF-004 | 1, 3 | Unit test `takeoff_relative_and_unknown_altitude_are_not_published` (1); R3S datum mapping (3) | scaffold-proven (Telemeter path) |
+| UAS-PRF-004 | 1, 3 | Unit test `takeoff_relative_and_unknown_altitude_are_not_published` (1); R3S datum mapping (3) | scaffold-proven (Telemeter path); camera point: take-off-relative altitude uses the shared `TakeoffRelative` ground model and is never relabelled (host test, milestone 3 task 6) |
 | UAS-PRF-007 | 1, 3 | Unit test speed km/h round trip; `fixtures/telemetry/sim-orbit-v1.jsonl` | scaffold-proven (Telemeter path) |
 | UAS-PRF-008 | 1, 3 | Fixture decodes with the unmodified shared decoder (1); old-client fixtures (3) | scaffold-proven (Telemeter path) |
 | UAS-FLT-001 | 4 | Hardware flight evidence; app-recreation and controller-disconnect tests | implemented but unproven (video and live values never run with an aircraft); link status and camera/gimbal controls specified |
@@ -85,8 +85,8 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-RAD-009 | 1, 4 | Information sensor text in fixture and emulator screenshot | scaffold-proven (telemetry) |
 | UAS-OBS-001 | 3, 5 | Sensor evidence: unit conversions, datum handling, orientation, pose/fix skew, near-nadir, unknown range, invalid geometry | specified |
 | UAS-OBS-002 | 3, 5 | Sensor evidence: unit conversions, datum handling, orientation, pose/fix skew, near-nadir, unknown range, invalid geometry | specified |
-| UAS-OBS-003 | 3, 5 | Sensor evidence: unit conversions, datum handling, orientation, pose/fix skew, near-nadir, unknown range, invalid geometry | specified |
-| UAS-OBS-004 | 3, 5 | Sensor evidence: unit conversions, datum handling, orientation, pose/fix skew, near-nadir, unknown range, invalid geometry | specified |
+| UAS-OBS-003 | 3, 5 | Sensor evidence: unit conversions, datum handling, orientation, pose/fix skew, near-nadir, unknown range, invalid geometry | partial (milestone 3 task 6): the camera-centre operator point gets coordinates only through the shared `camera_ground::ground_point`, which checks pose/fix skew, datum and staleness; host-tested and shown on the Pixel 7 with simulated values ([evidence](../evidence/m3-task6-camera-point.md)); image-space detections (5) not built |
+| UAS-OBS-004 | 3, 5 | Sensor evidence: unit conversions, datum handling, orientation, pose/fix skew, near-nadir, unknown range, invalid geometry | partial (milestone 3 task 6): refusals for unknown altitude reference or ground height, horizon and range are host-tested, and the conditional bound is in the marker notes ([evidence](../evidence/m3-task6-camera-point.md)); display sectors and detections (5) not covered |
 | UAS-VID-001 | 5 | Media and offline/mesh evidence | specified |
 | UAS-VID-002 | 5 | Media and offline/mesh evidence | specified |
 | UAS-VID-003 | 5 | Media and offline/mesh evidence | specified |
@@ -117,6 +117,10 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 - Operator view: the simulator APK on an API 35 x86_64 emulator shows sample 0 encoded by the shared `r3akt-map-core` encoder (90 bytes) and decoded by the shared decoder: [screenshot](../evidence/scaffold-sim-emulator-api35.png).
 - DJI 4 variant: it failed to start with `ClassNotFoundException: dji.sdk.sdkmanager.DJISDKManager`. The cause recorded here at the time (no x86_64 native libraries) was wrong: a static initializer used a DJI class before the SDK's class loader was installed. Corrected in the milestone 4 record below.
 - Receiving-client evidence (RCH map, REM) does not apply to the scaffold: nothing is published. It is the milestone 2 gate (RCH map in step 2a, REM in step 2b).
+
+## Milestone 3 operator-marker evidence record (10 November 2026, partial)
+
+Operator markers at the aircraft position (D-10 (a)) and at the camera point (D-10 (c), task 6, through the shared ground point of RCH #313, with simulated values) are captured; the radar pick (b) is deferred to the radar work of milestone 4. From the `simNet` build on a Pixel 7, a marker placed, moved and deleted in the adapted FreeTAKUAS panel is sent through the LXMF-rs custody outbox with the shared team encoder (RCH `83b5d64a`, fields 9 and 11). RCH relays it to team BLUE, and an unchanged REM `0cfa422` shows, moves and removes it. Changes made while the hub is down are delivered once each, in order, after it returns. Evidence: [relay spike](../evidence/m3-task0-marker-relay-spike.md), [outbox spike](../evidence/m3-task1-outbox-spike.md), [tasks 3 and 4](../evidence/m3-task3-4-markers.md), [re-pin and REM proof](../evidence/m3-task5-markers-rem-proof.md), [camera point](../evidence/m3-task6-camera-point.md); reviews in [pre-review.md](../integration/pre-review.md). Not covered: mission association (UAS-OBS-002), hub-time stamps (UAS-PRF-006), a DJI source.
 
 ## Milestone 2b evidence record (10 November 2026)
 

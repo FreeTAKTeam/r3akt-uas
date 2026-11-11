@@ -4,6 +4,7 @@
 //! sample is marked simulated (UAS-RAD-009) and uses an explicit, simulated
 //! MSL altitude rather than a converted take-off-relative value.
 
+use crate::camera::CameraPose;
 use crate::telemetry::{AltitudeReference, TelemetrySample};
 
 /// Orbit start, 2026-11-04T00:00:00Z.
@@ -13,6 +14,8 @@ pub const CENTER_LON_DEG: f64 = 7.0;
 pub const RADIUS_M: f64 = 200.0;
 pub const PERIOD_S: u32 = 120;
 pub const ALTITUDE_MSL_M: f64 = 400.0;
+/// Simulated flat ground under the orbit, so the aircraft flies 100 m above it.
+pub const GROUND_MSL_M: f64 = 300.0;
 const EARTH_RADIUS_M: f64 = 6_371_008.8;
 
 /// Sample `seq` of the orbit, one per second (1 Hz in-flight target, UAS-VID-005).
@@ -40,6 +43,25 @@ pub fn sample(seq: u32) -> TelemetrySample {
         horizontal_accuracy_m: 1.5,
         battery_percent: Some((100.0 - f64::from(seq) * 0.1).max(0.0)),
         simulated: true,
+    }
+}
+
+/// Simulated gimbal for sample `seq`: the camera stays on the orbit centre, so its
+/// ground point has a known answer. The error bounds are simulated values too.
+#[uniffi::export]
+#[must_use]
+pub fn camera(seq: u32) -> CameraPose {
+    let angle = 360.0 * f64::from(seq % PERIOD_S) / f64::from(PERIOD_S);
+    CameraPose {
+        sample_time_ms: (START_TIME_S + u64::from(seq)) * 1000,
+        azimuth_deg: (angle + 180.0).rem_euclid(360.0),
+        elevation_deg: -(ALTITUDE_MSL_M - GROUND_MSL_M).atan2(RADIUS_M).to_degrees(),
+        ground_height_m: Some(GROUND_MSL_M),
+        ground_height_error_m: 2.0,
+        altitude_error_m: 1.0,
+        azimuth_error_deg: 1.0,
+        elevation_error_deg: 1.0,
+        max_speed_mps: 12.0,
     }
 }
 

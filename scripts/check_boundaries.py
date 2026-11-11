@@ -18,7 +18,10 @@ SHARED = {"r3akt-map-core", "r3akt-profile-rch", "r3akt-protocol", "r3akt-mesh-d
           # Owner ruling R-2 (milestone 2a): lxmf-runtime needs the host to construct the
           # transport and identity. Construction calls only; no routing, queueing or
           # interface-management logic belongs in this repository.
-          "reticulum-rs-transport", "reticulum-rs-core"}
+          "reticulum-rs-transport", "reticulum-rs-core",
+          # Owner ruling D-12 (operator markers): marker changes are kept and recovered by the
+          # LXMF-rs custody outbox (lxmf-runtime LocalPropagation), whose store types live here.
+          "lxmf-propagation"}
 
 meta = json.loads(subprocess.check_output(
     ["cargo", "metadata", "--format-version", "1", "--no-deps", ]))

@@ -28,8 +28,8 @@ interface AircraftSource {
     /** Runs a local flight action now; `onResult(null)` = accepted, otherwise the error text. May call back on any thread. */
     fun perform(action: FlightAction, onResult: (String?) -> Unit) = onResult("Not available")
 
-    /** An extra button in the session log as (label, action), or null for none. */
-    fun logAction(): Pair<String, () -> Unit>? = null
+    /** An extra button in the session log as (label, action on the cockpit activity), or null for none. */
+    fun logAction(): Pair<String, (android.app.Activity) -> Unit>? = null
 
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null

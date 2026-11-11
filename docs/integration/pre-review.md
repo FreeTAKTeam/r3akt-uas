@@ -116,8 +116,36 @@ A fresh reviewer read commits `eaddade` to `e16d135`, the evidence and the pinne
 | P7 | minor | Stale `c2bf78a` references and gate status. | Profile baseline note, R3S contract link, reuse matrix RCH service row, `rch-rem-changes.md` ordering note and this gate status updated. |
 | P8 | minor | Encoder failures on the team path are labelled `Invalid`. | Accepted (label only). |
 
+## Focused PRE: operator-marker plan, revision 1 (10 November 2026)
+
+One fresh reviewer read [the operator-marker plan](../goals/m3-markers/PLAN.md) and its spike against RCH `f5822210`, REM `0cfa422`, FreeTAKUAS `704f4aa` and the open upstream issues. Verdict: **blocked** (one blocker, two owner decisions). Owner rulings and the corrections are in revision 2.
+
+| # | Severity | Finding | Resolution in revision 2 |
+|---|---|---|---|
+| 1 | blocker | The shared map-core marker store has no pending slot and drops deleted rows; durability there would need a parallel queue. | D-12 (owner): LXMF-rs shared custody outbox `LocalPropagation`; task 1 verifies it with a stop rule. |
+| 2 | major | "Sent" is not delivered; a lost create makes later moves fail silently. | Messages stay in the outbox until delivered; nothing is cleared on hand-off. |
+| 3 | major | Replay rules: old moves overwrite newer ones (hub time), a create replayed after delete re-creates the marker, REM keeps no tombstone. | D-12 keeps only {create, latest move, delete} per marker and withdraws create/moves once a delete is deposited; replay-order tests in task 3. |
+| 4 | major | Map/radar placement (mode b) cannot be built without the private `destination()`. | Moved to task 6 with the camera point, after RCH #313. |
+| 5 | major | Simulated and aircraft-position markers were not labelled. | D-11 and D-10 labels; kill criterion. |
+| 6 | major | The hub route needs only field 9 plus field 11, not all of #314; REM receives RCH's own response. | D-13 (owner): gate on the small RCH #315 (team on `encode_commands`). |
+| 7 | major | No per-marker owner on RCH; the app's list can drift. | Known limit; the list shows the last sent state. |
+| 8 | major | Hub time replaces source time; the shared marker Telemeter fills altitude/accuracy 0.0. | Known limits; upstream gaps to record in task 3. |
+| 9–14 | minor | Requirement fit (OBS-002 partial, PRD-010 offline), task 5 simulator gimbal values, file lists, D-11 category, map-core `sqlite` fine for Android (now unused), move/delete do reach REM, REM revision drift (`50c0bb6`). | Applied in task rows and limits; REM `0cfa422` stays the tested revision. |
+
+## POST: operator markers, tasks 2 and 5 (10 November 2026)
+
+One fresh reviewer read the uncommitted re-pin and encoder switch, commit `b08375e` for context, the [task 5 evidence](../evidence/m3-task5-markers-rem-proof.md) with its screenshots, and the updated records. It found no kill criterion hit: this repository still writes no wire fields, envelopes or queues. Verdict: **pass with fixes**, with no blocker.
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| Q1 | minor | The panel said "last sent state" while a change could be only stored. | The panel now says "last change made here" and shows the stored count from `PublishStatus.markers_pending`. Checked on the Pixel; plan wording updated. |
+| Q2 | minor | No RCH map view or per-step RCH API output. | Evidence states that the hub evidence is the inbound log plus the final `/api/markers`. |
+| Q3 | minor | A delete during an outage is host-proven only. | Stated in the evidence and in UAS-PRD-010. |
+| Q4 | nit | Without a team UID, markers reach RCH but not REM. | Stated in the evidence. |
+| Q5 | nit | G-23 did not cite the merge of RCH #316. | Added. |
+
 ## Gate status
 
 - Milestone 1 (specification and scaffold): complete. The `ci` workflow builds from a clone on GitHub and passed, and the dji4 variant runs on a Pixel 7 (see the records in [acceptance.md](../specification/acceptance.md)).
 - PRE gate for milestone 2a: **passed on 10 November 2026.** The two blockers of the first focused PRE were ruled on by the owner, the second pass found no blocker, and its corrections are applied in plan revision 3. The POST review of the task 5 hub evidence (above) found no blocker; its corrections are applied and task 6 may start.
-- Milestone 2b (REM): PRE passed; owner rulings D-5 to D-9 taken; tasks 0 to 3 done and the POST review above found no blocker (corrections applied). Task 4 (simNet device proof) may start. Milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE.
+- Milestone 2b (REM): PRE passed; owner rulings D-5 to D-9 taken; tasks 0 to 3 done and the POST review above found no blocker (corrections applied). Task 4 (simNet device proof) may start. Operator markers (milestone 3): PRE revision 2 applied; tasks 0 to 5 done and the POST review above found no blocker (corrections applied); task 6 waits for RCH #313. Milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE.

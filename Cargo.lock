@@ -1068,11 +1068,13 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 [[package]]
 name = "r3akt-map-core"
 version = "0.1.0"
-source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=f5822210da63ce303ee86ffa95d67e0db5e12b3d#f5822210da63ce303ee86ffa95d67e0db5e12b3d"
+source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=d7ad6e17719baf0ea7221343c0cd8beb8ab806ab#d7ad6e17719baf0ea7221343c0cd8beb8ab806ab"
 dependencies = [
  "base64",
  "chrono",
+ "r3akt-profile-rch",
  "rmp-serde",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
@@ -1083,7 +1085,7 @@ dependencies = [
 [[package]]
 name = "r3akt-profile-rch"
 version = "0.1.0"
-source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=f5822210da63ce303ee86ffa95d67e0db5e12b3d#f5822210da63ce303ee86ffa95d67e0db5e12b3d"
+source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=d7ad6e17719baf0ea7221343c0cd8beb8ab806ab#d7ad6e17719baf0ea7221343c0cd8beb8ab806ab"
 dependencies = [
  "r3akt-protocol",
  "rmp-serde",
@@ -1097,7 +1099,7 @@ dependencies = [
 [[package]]
 name = "r3akt-protocol"
 version = "0.1.0"
-source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=f5822210da63ce303ee86ffa95d67e0db5e12b3d#f5822210da63ce303ee86ffa95d67e0db5e12b3d"
+source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=d7ad6e17719baf0ea7221343c0cd8beb8ab806ab#d7ad6e17719baf0ea7221343c0cd8beb8ab806ab"
 dependencies = [
  "chrono",
  "rmp-serde",
@@ -1112,6 +1114,7 @@ name = "r3akt-uas-app"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "lxmf-propagation",
  "lxmf-runtime",
  "lxmf-sdk",
  "r3akt-map-core",
@@ -1119,6 +1122,7 @@ dependencies = [
  "rand_core",
  "reticulum-rs-core",
  "reticulum-rs-transport",
+ "rusqlite",
  "serde_json",
  "thiserror 2.0.21",
  "tokio",

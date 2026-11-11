@@ -120,7 +120,7 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setView(ScrollView(this).apply { addView(text) })
             .setPositiveButton(android.R.string.ok, null)
-            .apply { Variant.source.logAction()?.let { (label, action) -> setNeutralButton(label) { _, _ -> action() } } }
+            .apply { Variant.source.logAction()?.let { (label, action) -> setNeutralButton(label) { _, _ -> action(this@MainActivity) } } }
             .show()
     }
 

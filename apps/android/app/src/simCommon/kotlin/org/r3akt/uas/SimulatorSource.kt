@@ -1,5 +1,6 @@
 package org.r3akt.uas
 
+import org.r3akt.uas.bridge.camera
 import org.r3akt.uas.bridge.decodeTelemetry
 import org.r3akt.uas.bridge.encodeTelemetry
 import org.r3akt.uas.bridge.sample
@@ -43,6 +44,8 @@ open class SimulatorSource : AircraftSource {
             longitudeDeg = s.longitudeDeg,
             batteryPercent = s.batteryPercent?.roundToInt(),
             flightTimeS = seq.toLong(),
+            // Simulated gimbal, aimed at the orbit centre (shared with the camera point).
+            gimbalPitchDeg = camera(seq).elevationDeg,
         )
     }
 }
