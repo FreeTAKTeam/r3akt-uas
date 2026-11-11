@@ -52,6 +52,10 @@ class HudView(context: Context) : ViewGroup(context) {
     var aimMarker: Pair<String, Int>? = null
         set(value) { field = value; invalidate() }
 
+    /** Contacts for the small radar, set on every cockpit poll. */
+    var contacts: List<org.r3akt.uas.Contact> = emptyList()
+        set(value) { if (value != field) { field = value; invalidate() } }
+
     /** The HUD scale and the screen y of the design's line [dy], for overlays laid out on the same grid. */
     val unit get() = s
     fun screenY(dy: Float) = y(dy)
@@ -548,6 +552,10 @@ class HudView(context: Context) : ViewGroup(context) {
         if (hdg == null) {
             // UAS-RAD-008: without aircraft heading the radar says so; phone heading is never used.
             write(c, "NO HEADING", cx, cy - 18 * s, 11f, Hud.AMBER, align = Paint.Align.CENTER)
+            // Contacts are then drawn north-up, and the aircraft as a dot with no direction.
+            write(c, "N", cx, cy - 66 * s, 11f, Hud.WHITE, align = Paint.Align.CENTER, spacing = 0f)
+            fill.color = Hud.WHITE
+            c.drawCircle(cx, cy, 5 * s, fill)
         } else {
             stroke(c, cx, cy - 62 * s, cx, cy, 0x8CFFFFFF.toInt(), 1.5f)
             for ((name, bearing) in listOf("N" to 0.0, "E" to 90.0, "S" to 180.0, "W" to 270.0)) {
@@ -555,16 +563,33 @@ class HudView(context: Context) : ViewGroup(context) {
                 write(c, name, cx + (70 * sin(a)).toFloat() * s, cy - (70 * cos(a)).toFloat() * s + 4 * s, 11f,
                     if (name == "N") Hud.WHITE else Hud.GREEN, align = Paint.Align.CENTER, spacing = 0f)
             }
+            path.reset()
+            path.moveTo(cx, cy - 8 * s)
+            path.lineTo(cx + 7 * s, cy + 8 * s)
+            path.lineTo(cx, cy + 4 * s)
+            path.lineTo(cx - 7 * s, cy + 8 * s)
+            path.close()
+            fill.color = Hud.WHITE
+            c.drawPath(path, fill)
         }
-        path.reset()
-        path.moveTo(cx, cy - 8 * s)
-        path.lineTo(cx + 7 * s, cy + 8 * s)
-        path.lineTo(cx, cy + 4 * s)
-        path.lineTo(cx - 7 * s, cy + 8 * s)
-        path.close()
-        fill.color = Hud.WHITE
-        c.drawPath(path, fill)
-        write(c, "500 m", cx, cy + 48 * s, 10f, Hud.GREEN, monospace = true, align = Paint.Align.CENTER)
+        val maxM = org.r3akt.uas.Prefs.radarRangeM(context).toDouble()
+        write(c, org.r3akt.uas.screens.RadarLogic.distance(maxM), cx, cy + 48 * s, 10f, Hud.GREEN, monospace = true, align = Paint.Align.CENTER)
+        // Contacts inside the range, north-up without heading; none without aircraft position (UAS-RAD-008).
+        val lat = state.latitudeDeg
+        val lon = state.longitudeDeg
+        if (lat == null || lon == null) {
+            write(c, "NO POSITION", cx, cy + 24 * s, 11f, Hud.AMBER, align = Paint.Align.CENTER)
+            return
+        }
+        val polar = contacts.map { k ->
+            FloatArray(2).also { android.location.Location.distanceBetween(lat, lon, k.lat, k.lon, it) }
+        }
+        val sel = org.r3akt.uas.screens.RadarLogic.select(polar.map { it[0].toDouble() }, maxM)
+        line.strokeWidth = 1f * s
+        for (i in sel.drawn) {
+            val (dx, dy) = org.r3akt.uas.screens.RadarLogic.project(polar[i][0].toDouble(), polar[i][1].toDouble(), hdg, maxM, 62.0 * s)
+            org.r3akt.uas.screens.ContactSymbol.draw(c, contacts[i].symbol, cx + dx.toFloat(), cy + dy.toFloat(), 3.5f * s, fill, line)
+        }
     }
 
     private fun drawTelemetry(c: Canvas, st: HudState) {

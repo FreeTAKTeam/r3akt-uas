@@ -1,0 +1,10 @@
+# Range boundaries (UAS-RAD-002): range_m max_range_m in|out
+0 500 in
+499.9 500 in
+500 500 in
+500.1 500 out
+1000 1000 in
+1000.01 1000 out
+2000 2000 in
+5000 5000 in
+5000.5 5000 out

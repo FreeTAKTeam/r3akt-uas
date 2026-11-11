@@ -24,8 +24,8 @@ import org.r3akt.uas.hud.Hud
 import org.r3akt.uas.hud.HudState
 import kotlin.math.hypot
 
-/** This session's flight track; it outlives the page, which sees positions only while open. */
-private val sessionTrack = Track()
+/** This session's flight track, fed by the cockpit's poll so it is complete while the map is closed. */
+internal val sessionTrack = Track()
 
 /** A north-up local map of the aircraft, its track and the contacts. No basemap in this pass. */
 class MapScreen(activity: Activity, close: () -> Unit) : ScreenPage {
@@ -34,7 +34,6 @@ class MapScreen(activity: Activity, close: () -> Unit) : ScreenPage {
     override val view = frame.root
 
     init {
-        sessionTrack.gap() // positions while the page was closed were not observed
         val dp = { v: Int -> PageFrame.dp(activity, v) }
         frame.body.addView(map)
         val buttons = LinearLayout(activity).apply {
@@ -93,7 +92,6 @@ private class MapView(context: Context, private val mono: Typeface) : View(conte
 
     fun update(st: HudState) {
         state = st
-        sessionTrack.add(st.latitudeDeg, st.longitudeDeg)
         val r = runCatching { Variant.source.contacts() }
         contacts = r.getOrDefault(emptyList())
         contactsFailed = r.isFailure

@@ -22,6 +22,7 @@ import org.r3akt.uas.hud.HudView
 import org.r3akt.uas.screens.Screen
 import org.r3akt.uas.screens.ScreenPage
 import org.r3akt.uas.screens.openScreen
+import org.r3akt.uas.screens.sessionTrack
 
 /** The flight cockpit: the HUD skin over the aircraft source and its live video. */
 class MainActivity : Activity() {
@@ -41,7 +42,9 @@ class MainActivity : Activity() {
                 .getOrElse { HudState(status = "SOURCE ERROR", simulated = false) }
             // An unchanged state is not redrawn: the HUD shares the main thread with the video view.
             if (state != hud.state) hud.state = state
+            hud.contacts = runCatching { Variant.source.contacts() }.getOrDefault(emptyList())
             SessionLog.onState(state)
+            sessionTrack.add(state.latitudeDeg, state.longitudeDeg)
             page?.update(state)
             showVideo(state.video)
             handler.postDelayed(this, Variant.source.periodMs)
