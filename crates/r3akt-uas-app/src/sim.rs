@@ -39,8 +39,8 @@ pub fn sample(seq: u32) -> TelemetrySample {
         altitude_m: ALTITUDE_MSL_M,
         altitude_reference: AltitudeReference::Msl,
         ground_speed_mps: std::f64::consts::TAU * RADIUS_M / f64::from(PERIOD_S),
-        course_deg: course,
-        horizontal_accuracy_m: 1.5,
+        course_deg: Some(course),
+        horizontal_accuracy_m: Some(1.5),
         battery_percent: Some((100.0 - f64::from(seq) * 0.1).max(0.0)),
         simulated: true,
     }
@@ -76,6 +76,6 @@ mod tests {
         let lap = sample(PERIOD_S);
         assert!((start.latitude_deg - lap.latitude_deg).abs() < 1e-12);
         assert_eq!(lap.sample_time_s - start.sample_time_s, u64::from(PERIOD_S));
-        assert!((start.course_deg - 90.0).abs() < 1e-9);
+        assert!((start.course_deg.unwrap() - 90.0).abs() < 1e-9);
     }
 }

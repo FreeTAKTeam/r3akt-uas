@@ -54,8 +54,8 @@ pub(crate) fn origin_position(sample: &TelemetrySample) -> OriginPosition {
         altitude_datum: datum.unwrap_or_default(),
         fix_at_ms: sample.fix_time_s.saturating_mul(1000),
         speed_mps: Some(sample.ground_speed_mps),
-        course_deg: Some(sample.course_deg),
-        accuracy_m: Some(sample.horizontal_accuracy_m),
+        course_deg: sample.course_deg,
+        accuracy_m: sample.horizontal_accuracy_m,
     }
 }
 
@@ -152,7 +152,7 @@ mod tests {
             * sim::CENTER_LAT_DEG.to_radians().cos();
         assert!(north_m.hypot(east_m) < 1.0, "{north_m} {east_m}");
         assert!((point.ground_range_m - sim::RADIUS_M).abs() < 0.5);
-        assert!(point.uncertainty_radius_m > fix.horizontal_accuracy_m);
+        assert!(point.uncertainty_radius_m > fix.horizontal_accuracy_m.unwrap());
         assert!(point.uncertainty_radius_m < 50.0);
     }
 

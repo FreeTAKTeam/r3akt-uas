@@ -249,13 +249,34 @@ fn hex32(value: &str, what: &str) -> Result<String, PublishError> {
     }
 }
 
-/// Offers the latest fix. It replaces any fix not yet sent; nothing is queued.
+/// Fix time of the last fix handed to the worker, for the publication rate.
+static LAST_OFFERED_S: Mutex<Option<u64>> = Mutex::new(None);
+
+/// UAS-VID-005: 1 Hz while moving, 0.2 Hz while stationary.
+fn due(last_offered_s: Option<u64>, sample: &TelemetrySample) -> bool {
+    let interval_s = if sample.ground_speed_mps >= crate::dji::MIN_MOVING_SPEED_MPS {
+        1
+    } else {
+        5
+    };
+    last_offered_s.is_none_or(|last| sample.fix_time_s >= last.saturating_add(interval_s))
+}
+
+/// Offers the latest fix, however often the source polls. It always becomes the
+/// marker placement position; it goes to the hub only at the publication rate,
+/// replacing any fix not yet sent. Nothing is queued.
 #[uniffi::export]
 pub fn publish_offer_fix(sample: TelemetrySample) {
     *LAST_FIX
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sample.clone());
-    send_cmd(Cmd::Fix(sample));
+    let mut last = LAST_OFFERED_S
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if due(*last, &sample) {
+        *last = Some(sample.fix_time_s);
+        send_cmd(Cmd::Fix(sample));
+    }
 }
 
 pub(crate) fn last_fix() -> Option<TelemetrySample> {
@@ -658,8 +679,8 @@ mod tests {
             altitude_m: 30.0,
             altitude_reference: reference,
             ground_speed_mps: 5.0,
-            course_deg: 90.0,
-            horizontal_accuracy_m: 2.0,
+            course_deg: Some(90.0),
+            horizontal_accuracy_m: Some(2.0),
             battery_percent: None,
             simulated: true,
         }
@@ -729,6 +750,24 @@ mod tests {
         };
         assert_eq!(keys(&with_team), ["11", "13", "3"]);
         assert_eq!(keys(&without), ["13"]);
+    }
+
+    #[test]
+    fn publication_rate_is_1_hz_moving_and_0_2_hz_stationary() {
+        let moving = sample(AltitudeReference::Msl);
+        let at = |s: &TelemetrySample, t: u64| TelemetrySample {
+            fix_time_s: t,
+            ..s.clone()
+        };
+        assert!(due(None, &moving));
+        assert!(!due(Some(100), &at(&moving, 100)));
+        assert!(due(Some(100), &at(&moving, 101)));
+        let still = TelemetrySample {
+            ground_speed_mps: 0.4,
+            ..moving
+        };
+        assert!(!due(Some(100), &at(&still, 104)));
+        assert!(due(Some(100), &at(&still, 105)));
     }
 
     #[test]
