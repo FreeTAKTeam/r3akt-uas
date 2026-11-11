@@ -39,4 +39,10 @@ interface AircraftSource {
 
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null
+
+    /** Connection/setup checklist rows this source reports; what it cannot report stays [SetupState.UNKNOWN]. */
+    fun setupItems(): List<SetupItem> = emptyList()
+
+    /** Read-only build configuration as (name, value) for the settings page; never a credential. */
+    fun configItems(): List<Pair<String, String>> = emptyList()
 }

@@ -46,4 +46,12 @@ open class SimulatorSource(private val networkReport: String = "Network publicat
             gimbalPitchDeg = camera(seq).elevationDeg,
         )
     }
+
+    override fun setupItems() = listOf(
+        SetupItem("Aircraft", SetupState.OK, "SIMULATED in-process orbit; no hardware"),
+        SetupItem("DJI SDK", SetupState.NOT_IN_BUILD, "The simulator build has no DJI SDK, key or controller"),
+        SetupItem("Video", SetupState.NOT_IN_BUILD, "The simulator has no video"),
+    )
+
+    override fun configItems() = listOf("DJI SDK key" to "not in this build (simulator)")
 }

@@ -127,4 +127,38 @@ class PublishingSource(
             (startError ?: s.lastError)?.let { appendLine("error $it") }
         }.trimEnd()
     }
+
+    override fun setupItems(): List<SetupItem> {
+        val s = publishStatus()
+        val error = startError ?: s.lastError
+        val missing = listOfNotNull(
+            "r3aktHubAddress".takeIf { BuildConfig.HUB_ADDRESS.isEmpty() },
+            "r3aktHubDestination".takeIf { BuildConfig.HUB_DESTINATION.isEmpty() },
+        )
+        return inner.setupItems() + listOf(
+            if (missing.isEmpty()) SetupItem("Hub", SetupState.OK, "${BuildConfig.HUB_ADDRESS}, destination ${BuildConfig.HUB_DESTINATION}")
+            else SetupItem("Hub", SetupState.PROBLEM, "Not set at build time: ${missing.joinToString()}"),
+            SetupItem(
+                "Hub publishing",
+                when {
+                    error != null || s.state == PublishState.FAILED -> SetupState.PROBLEM
+                    publishing && s.state == PublishState.SENT -> SetupState.OK
+                    else -> SetupState.WAITING
+                },
+                when {
+                    publishing -> "${s.state.name}, hub connected ${s.hubConnected}, fixes sent ${s.fixesSent}" +
+                        if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""
+                    stoppedByPause -> "Stopped when the cockpit paused; LOG → START PUBLISH"
+                    else -> "Off; LOG → START PUBLISH"
+                } + (error?.let { "\nError: $it" } ?: ""),
+            ),
+        )
+    }
+
+    override fun configItems() = inner.configItems() + listOf(
+        "Hub address" to BuildConfig.HUB_ADDRESS.ifEmpty { "not set (r3aktHubAddress)" },
+        "Hub destination" to BuildConfig.HUB_DESTINATION.ifEmpty { "not set (r3aktHubDestination)" },
+        "Team UID" to BuildConfig.TEAM_UID.ifEmpty { "none (r3aktTeamUid not set)" },
+        "App identity (destination hash)" to (publishStatus().destinationHash ?: "created on the first publish"),
+    )
 }
