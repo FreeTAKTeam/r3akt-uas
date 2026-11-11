@@ -67,6 +67,10 @@ Recorded 10 November 2026 for branch `feat/dji-net`; plan: [DJI field-trial buil
 - **R3AKT Server:** the Pixel's `dji4Net` connected and announced as `R3AKT UAS 84b40d98` (destination `84b40d986126dd2c67c3c935d9f55a24`). The owner confirmed it appeared in that hub's REM peers and added it to team BLUE (10 November 2026).
 - **Known effect (D-19):** the hub may now send the app REM traffic, for example Emergency Action Messages, which the app does not read (G-17).
 
+## Editable marker name (D-11)
+
+The marker panel gains a name field: a typed name replaces the picked Alpha–Zulu name, as D-11 asked ("name Alpha–Zulu with a counter, editable"). On the owner's request, the Pixel's `simNet` build placed a hostile marker "Putin 666" on the R3AKT Server. It sits at the simulated aircraft position with the notes "SIMULATED · at aircraft position", and the report then showed "operator markers waiting for the hub: 0". Afterwards, publishing was stopped and `dji4Net` reinstalled.
+
 ## Not yet shown
 
 The ground test (task 4) and the flight test (task 5) need the owner, a Mavic Air 2 or Air 2S with the RC-N1, and the hub reachable from the field (D-17). Until then everything from the aircraft onwards is implemented but unproven:

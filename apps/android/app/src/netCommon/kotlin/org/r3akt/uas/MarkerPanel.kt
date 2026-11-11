@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.ScrollView
@@ -43,6 +44,7 @@ class MarkerPanel(
     )
     private lateinit var listView: LinearLayout
     private lateinit var header: TextView
+    private lateinit var nameField: EditText
     private var dialog: AlertDialog? = null
 
     fun show() {
@@ -67,17 +69,23 @@ class MarkerPanel(
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(pickers)
+                // D-11: the picked name is the default; a typed name replaces it, as in the FreeTAKUAS popup.
+                nameField = EditText(activity).apply {
+                    hint = "or type a name"
+                    isSingleLine = true
+                }
+                addView(nameField)
                 addView(Button(activity).apply {
                     text = "PLACE AT CAMERA"
                     setOnClickListener {
                         val pose = cameraPose?.invoke()
                         val base = names[name.value]
+                        val typed = typedName()
                         val chosen = affiliations[affiliation.value]
                         run("placed") {
                             if (cameraPose == null) error("no camera point from this aircraft source: it reports no position accuracy")
                             if (pose == null) error("aircraft position unknown")
-                            val count = markerList().count { it.name.startsWith("$base-") } + 1
-                            markerCreateAtCamera("$base-$count", chosen, pose).name
+                            markerCreateAtCamera(typed ?: nextName(base), chosen, pose).name
                         }
                     }
                 })
@@ -94,14 +102,17 @@ class MarkerPanel(
         // Keep the panel open after placing, like the FreeTAKUAS popup's Send.
         dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
             val base = names[name.value]
+            val typed = typedName()
             val chosen = affiliations[affiliation.value]
-            run("placed") {
-                val count = markerList().count { it.name.startsWith("$base-") } + 1
-                markerCreate("$base-$count", chosen).name
-            }
+            run("placed") { markerCreate(typed ?: nextName(base), chosen).name }
         }
         refresh()
     }
+
+    private fun typedName(): String? = nameField.text.toString().trim().ifEmpty { null }
+
+    // Alpha-1, Alpha-2, ...: the FreeTAKUAS counter. Runs on the worker (it reads the store).
+    private fun nextName(base: String) = "$base-${markerList().count { it.name.startsWith("$base-") } + 1}"
 
     private fun picker(values: Array<String>) = NumberPicker(activity).apply {
         minValue = 0
