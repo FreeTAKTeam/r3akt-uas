@@ -361,11 +361,35 @@ type Net = (
     TcpRuntimeStatusHandle,
 );
 
+/// REM's announce capabilities (owner ruling D-19): RCH lists a peer as a REM client, which an
+/// operator can add to a team, only with `r3akt` and `emergencymessages`. The app handles no
+/// Emergency Action Messages and reads nothing the hub sends it (G-17).
+const ANNOUNCE_CAPABILITIES: [&str; 3] = ["r3akt", "emergencymessages", "telemetry"];
+
+/// The LXMF delivery announce app data RCH lists the app by: a display name and
+/// [`ANNOUNCE_CAPABILITIES`], encoded by LXMF-rs.
+fn announce_app_data(destination_hash: &str) -> Option<Vec<u8>> {
+    let name = format!(
+        "R3AKT UAS {}",
+        destination_hash.get(..8).unwrap_or(destination_hash)
+    );
+    let capabilities = ANNOUNCE_CAPABILITIES.map(str::to_owned);
+    lxmf_core::announce::encode_delivery_announce_app_data_with_capabilities(
+        &name,
+        None,
+        &capabilities,
+    )
+    .ok()
+}
+
 /// Constructs the transport, the announced delivery destination and one TCP client.
+/// Path responses carry the same `app_data` as the announce, or a hub asking for a path
+/// to the app would overwrite the app's name and capabilities with an empty announce.
 fn connect(
     runtime: &tokio::runtime::Runtime,
     private: &PrivateIdentity,
     hub_address: &str,
+    app_data: Option<Vec<u8>>,
 ) -> Result<Net, String> {
     runtime.block_on(async {
         let transport = Arc::new(Transport::new(TransportConfig::new(
@@ -375,6 +399,9 @@ fn connect(
         )));
         let destination = transport
             .add_destination(private.clone(), DestinationName::new("lxmf", "delivery"))
+            .await;
+        transport
+            .set_destination_announce_app_data(&destination, app_data)
             .await;
         let manager = transport.iface_manager();
         let client = manager
@@ -432,6 +459,7 @@ fn run(
 ) -> Result<(), String> {
     let identity = AppIdentity::load_or_create(dir).map_err(|e| e.to_string())?;
     let source_hex = identity.destination_hash();
+    let announce_data = announce_app_data(&source_hex);
     update(|s| {
         s.destination_hash = Some(source_hex.clone());
         s.object_id = Some(identity.object_id().to_owned());
@@ -442,7 +470,8 @@ fn run(
         .build()
         .map_err(|e| format!("tokio runtime: {e}"))?;
     let private = identity.private_identity().clone();
-    let (transport, destination, tcp) = connect(&runtime, &private, hub_address)?;
+    let (transport, destination, tcp) =
+        connect(&runtime, &private, hub_address, announce_data.clone())?;
     let source = runtime.block_on(async { destination.lock().await.desc.address_hash });
     let (backend, outbox) = backend_and_outbox(&runtime, transport.clone(), private, source, dir)?;
     let hub_hash =
@@ -493,7 +522,7 @@ fn run(
             continue;
         }
         if !announced {
-            runtime.block_on(transport.send_announce(&destination, None));
+            runtime.block_on(transport.send_announce(&destination, announce_data.as_deref()));
             announced = true;
         }
 
@@ -768,6 +797,22 @@ mod tests {
         };
         assert!(!due(Some(100), &at(&still, 104)));
         assert!(due(Some(100), &at(&still, 105)));
+    }
+
+    #[test]
+    fn announce_names_the_app_like_a_rem_client() {
+        use lxmf_core::announce::{
+            capabilities_from_delivery_app_data, display_name_from_app_data,
+        };
+        let data = announce_app_data("8db226748847da27261859bff6e54ebe").unwrap();
+        assert_eq!(
+            display_name_from_app_data(Some(&data)).as_deref(),
+            Some("R3AKT UAS 8db22674")
+        );
+        assert_eq!(
+            capabilities_from_delivery_app_data(&data).unwrap(),
+            ["r3akt", "emergencymessages", "telemetry"]
+        );
     }
 
     #[test]

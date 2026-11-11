@@ -64,6 +64,8 @@ Status: **the focused PRE on revision 1 returned blocked (D-4, shared identity).
 
 Rulings: D-14 Mavic Air 2 or Air 2S with the RC-N1, key supplied by the owner; D-15 (a); D-16 as proposed; D-17 as proposed; D-18 approved.
 
+D-19 (owner, 10 November 2026): the app announces itself like a REM app. Its LXMF delivery announce carries a display name and REM's capabilities `r3akt`, `emergencymessages` and `telemetry`, encoded by LXMF-rs (`lxmf-wire`). RCH then lists it as a REM peer that an operator can add to a team. Known effect: the hub may send it REM traffic, such as Emergency Action Messages, that it does not read (G-17).
+
 | ID | Decision | Proposal (ruled as above) |
 |---|---|---|
 | D-14 | Aircraft and key | The owner names the aircraft and remote controller. They must be DJI Mobile SDK 4 products (for example the Mavic 2 or Phantom 4 series, or the Mavic Air 2). The owner also provides an app key for `org.r3akt.uas` in `~/.gradle/gradle.properties`. |
