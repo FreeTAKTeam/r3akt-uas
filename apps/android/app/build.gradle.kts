@@ -18,6 +18,9 @@ android {
     }
 
     flavorDimensions += "aircraft"
+    // Hub settings for the publishing test builds come from Gradle properties outside the repository.
+    val hub = { name: String -> "\"" + providers.gradleProperty(name).getOrElse("") + "\"" }
+    val djiApiKey = providers.gradleProperty("djiApiKey").getOrElse("")
     productFlavors {
         // Simulator: no DJI SDK, no registration credentials, no hardware (UAS-SCF-002).
         create("sim") { dimension = "aircraft" }
@@ -25,7 +28,6 @@ android {
         // Hub address and destination come from Gradle properties outside the repository.
         create("simNet") {
             dimension = "aircraft"
-            val hub = { name: String -> "\"" + providers.gradleProperty(name).getOrElse("") + "\"" }
             buildConfigField("String", "HUB_ADDRESS", hub("r3aktHubAddress"))
             buildConfigField("String", "HUB_DESTINATION", hub("r3aktHubDestination"))
             // Optional RCH team UID (field 11): with it the hub relays the aircraft to that team's REM clients.
@@ -33,14 +35,32 @@ android {
         }
         create("dji4") {
             dimension = "aircraft"
-            manifestPlaceholders["djiApiKey"] = providers.gradleProperty("djiApiKey").getOrElse("")
+            manifestPlaceholders["djiApiKey"] = djiApiKey
+        }
+        // Test build only (D-18): the DJI aircraft plus RCH publication, behind -Pr3aktPublish=true.
+        create("dji4Net") {
+            dimension = "aircraft"
+            manifestPlaceholders["djiApiKey"] = djiApiKey
+            buildConfigField("String", "HUB_ADDRESS", hub("r3aktHubAddress"))
+            buildConfigField("String", "HUB_DESTINATION", hub("r3aktHubDestination"))
+            buildConfigField("String", "TEAM_UID", hub("r3aktTeamUid"))
         }
     }
 
     buildFeatures { buildConfig = true }
     sourceSets {
         getByName("sim") { java.srcDir("src/simCommon/kotlin") }
-        getByName("simNet") { java.srcDir("src/simCommon/kotlin") }
+        getByName("simNet") {
+            java.srcDir("src/simCommon/kotlin")
+            java.srcDir("src/netCommon/kotlin")
+        }
+        getByName("dji4") { java.srcDir("src/dji4Common/kotlin") }
+        getByName("dji4Net") {
+            java.srcDir("src/dji4Common/kotlin")
+            java.srcDir("src/netCommon/kotlin")
+            // The same DJI manifest entries (key meta-data, USB accessory activity, INTERNET).
+            manifest.srcFile("src/dji4/AndroidManifest.xml")
+        }
     }
 
     packaging {
@@ -69,15 +89,16 @@ android {
 }
 
 // One build holds either the default variants (no publisher in the native library)
-// or simNet (with it), never both: the native bridge is a single unflavored module.
+// or the publishing test variants (with it), never both: the native bridge is a single unflavored module.
 val publish = providers.gradleProperty("r3aktPublish").map(String::toBoolean).getOrElse(false)
 androidComponents {
     beforeVariants { variant ->
-        variant.enable = (variant.productFlavors.single().second == "simNet") == publish
+        variant.enable = (variant.productFlavors.single().second in setOf("simNet", "dji4Net")) == publish
     }
 }
 
 dependencies {
     implementation(project(":native-bridge"))
     "dji4Implementation"(project(":dji4"))
+    "dji4NetImplementation"(project(":dji4"))
 }

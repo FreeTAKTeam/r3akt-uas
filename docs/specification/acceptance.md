@@ -132,6 +132,8 @@ Step 2a's evidence is captured; the milestone awaits owner acceptance. A simulat
 
 ## Milestone 4 evidence record (10 November 2026, partial)
 
+Update, DJI field-trial build ([evidence](../evidence/dji-net-tasks-1-3.md)): with the owner's app key, DJI registration succeeded on the Pixel 7 (Android 17): "registered, waiting for an aircraft". No aircraft has been connected yet, so everything below about the aircraft stays implemented but unproven.
+
 Milestone 4 has **not** passed: no aircraft or remote controller has been connected, and no valid DJI app key has been used. Device: Pixel 7, Android 17 (API 37), arm64-v8a.
 
 - Rust: `normalize_dji` turns raw DJI flight-controller values into cockpit values (heading 0-360, ground and vertical speed, take-off-relative altitude, position unknown without a fix); 2 unit tests, 6 in the workspace.

@@ -1,6 +1,6 @@
 # DJI field-trial build (`dji4Net`) — task plan (revision 2)
 
-Status: **the focused PRE on revision 1 returned blocked (D-4, shared identity). Every engineering finding is applied here ([PRE record](../../integration/pre-review.md)). The owner ruled on D-14 to D-18 on 10 November 2026, which clears both blockers; task 1 may start.** Owner direction (10 November 2026): be able to try the app with a real drone. Milestone 3's operator markers (merged in PR #6) are proven with the simulator only. Milestone 4 (DJI flight) has not passed: no aircraft or valid key has been used.
+Status: **the focused PRE on revision 1 returned blocked (D-4, shared identity). Every engineering finding is applied here ([PRE record](../../integration/pre-review.md)). The owner ruled on D-14 to D-18 on 10 November 2026, which clears both blockers. Tasks 1 to 3 are done; with the owner's key, DJI registration succeeded on the Pixel 7, and without an aircraft nothing is published ([evidence](../../evidence/dji-net-tasks-1-3.md)). Tasks 4 and 5 need the aircraft.** Owner direction (10 November 2026): be able to try the app with a real drone. Milestone 3's operator markers (merged in PR #6) are proven with the simulator only. Milestone 4 (DJI flight) has not passed: no aircraft or valid key has been used.
 
 **Intent:** the same publisher and marker panel as `simNet`, fed by a real DJI SDK 4 aircraft. A pilot on a field trial then shows up in RCH and REM and places markers from the flight app.
 **Expected outcome:**

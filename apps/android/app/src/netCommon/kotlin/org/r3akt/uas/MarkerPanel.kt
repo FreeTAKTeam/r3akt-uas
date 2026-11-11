@@ -32,8 +32,8 @@ import java.util.concurrent.Executor
 class MarkerPanel(
     private val activity: Activity,
     private val worker: Executor,
-    /** The camera pose now, read on the tap so it matches the aircraft fix. */
-    private val cameraPose: () -> CameraPose,
+    /** The camera pose of the last fix, read on the tap; `null` when the source has no camera point. */
+    private val cameraPose: (() -> CameraPose?)?,
 ) {
     private val affiliations = Affiliation.entries.toTypedArray()
     private val names = arrayOf(
@@ -70,10 +70,12 @@ class MarkerPanel(
                 addView(Button(activity).apply {
                     text = "PLACE AT CAMERA"
                     setOnClickListener {
-                        val pose = cameraPose()
+                        val pose = cameraPose?.invoke()
                         val base = names[name.value]
                         val chosen = affiliations[affiliation.value]
                         run("placed") {
+                            if (cameraPose == null) error("no camera point from this aircraft source: it reports no position accuracy")
+                            if (pose == null) error("aircraft position unknown")
                             val count = markerList().count { it.name.startsWith("$base-") } + 1
                             markerCreateAtCamera("$base-$count", chosen, pose).name
                         }
@@ -148,7 +150,7 @@ class MarkerPanel(
     /** Runs one bridge call off the UI thread and reports its outcome. */
     private fun run(done: String, call: () -> String) = worker.execute {
         val message = runCatching { "${call()} $done (stored for the hub)" }
-            .getOrElse { "Not done: ${it.message ?: it}" }
+            .getOrElse { "Not done: ${it.message?.removePrefix("reason=") ?: it}" }
         activity.runOnUiThread { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
         refresh()
     }

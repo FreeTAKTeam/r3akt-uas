@@ -56,3 +56,7 @@ jobs:
           if "$aapt2" dump permissions apps/android/app/build/outputs/apk/sim/debug/app-sim-debug.apk | grep -c android.permission.INTERNET >/dev/null; then
             echo "sim APK requests INTERNET" >&2; exit 1
           fi
+      # After the default checks: this rebuilds the native bridge with the publisher.
+      - name: Build the publishing test variants (no key, no hub settings; D-4, D-18)
+        working-directory: apps/android
+        run: ./gradlew --no-daemon -Pr3aktPublish=true :app:assembleSimNetDebug :app:assembleDji4NetDebug
