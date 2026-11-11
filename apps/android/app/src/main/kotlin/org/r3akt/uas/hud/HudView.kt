@@ -13,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import org.r3akt.uas.R
+import org.r3akt.uas.screens.Screen
 import org.r3akt.uas.bridge.AltitudeReference
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -39,6 +40,8 @@ class HudView(context: Context) : ViewGroup(context) {
 
     var onBack: () -> Unit = {}
     var onLog: () -> Unit = {}
+    /** Opens a page over the cockpit. */
+    var onScreen: (Screen) -> Unit = {}
     var onAction: (FlightAction) -> Unit = {}
 
     /** Tap on the aim cross; null when this source cannot place markers. */
@@ -72,15 +75,20 @@ class HudView(context: Context) : ViewGroup(context) {
         HudButton(context, { s }, label, icon, text, bare, shutter)
 
     private val back = button(Hud.back, bare = true).apply { contentDescription = "Back" }
-    private val settings = button(Hud.more, bare = true).apply { contentDescription = "Settings, not built yet"; isEnabled = false }
+    private val settings = button(Hud.more, bare = true).apply { contentDescription = "Settings" }
     private val flight = button(Hud.aircraft, "FLIGHT")
     private val takeoffLand = button(Hud.takeoff, "TAKEOFF")
     private val rth = button(Hud.home, "RTH")
     private val cameraMode = button(Hud.photo).apply { contentDescription = "Camera mode, not built yet"; isEnabled = false }
     private val shutterButton = button(null, shutter = true).apply { contentDescription = "Take photo" }
     private val menu = button(Hud.menu, "MENU")
-    private val map = button(Hud.map, "MAP").apply { contentDescription = "Map, not built yet"; isEnabled = false }
-    private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations, not built yet"; isEnabled = false }
+    private val map = button(Hud.map, "MAP").apply { contentDescription = "Map" }
+    private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations" }
+    private val radar = button(null, "RADAR").apply { contentDescription = "Radar" }
+    private val setup = button(null, "SETUP").apply { contentDescription = "Connection and setup" }
+    private val sessions = button(null, "HIST").apply { contentDescription = "Sessions and recordings" }
+    // Invisible: the small radar is drawn below; this only takes the tap.
+    private val radarTap = View(context).apply { contentDescription = "Open the radar"; isFocusable = true }
     private val log = button(Hud.log, "LOG").apply { contentDescription = "Session log" }
     private val slider = HudSlider(context, { s }, label)
     private val cancel = button(null, "CANCEL")
@@ -92,6 +100,7 @@ class HudView(context: Context) : ViewGroup(context) {
         setWillNotDraw(false)
         // First, so every other control drawn over the reticle area keeps its taps.
         add(aim, 381f, 206f, 198f, 128f, Anchor.CENTER)
+        add(radarTap, 12f, 368f, 156f, 156f, Anchor.LEFT)
         add(back, 0f, 0f, 44f, 40f, Anchor.LEFT)
         add(settings, 916f, 0f, 44f, 40f, Anchor.RIGHT)
         add(flight, 12f, 132f, 60f, 60f, Anchor.LEFT)
@@ -103,12 +112,22 @@ class HudView(context: Context) : ViewGroup(context) {
         add(map, 692f, 476f, 60f, 52f, Anchor.RIGHT)
         add(observations, 756f, 476f, 60f, 52f, Anchor.RIGHT)
         add(log, 820f, 476f, 60f, 52f, Anchor.RIGHT)
+        add(radar, 692f, 416f, 60f, 52f, Anchor.RIGHT)
+        add(setup, 756f, 416f, 60f, 52f, Anchor.RIGHT)
+        add(sessions, 820f, 416f, 60f, 52f, Anchor.RIGHT)
         add(slider, 308f, 266f, 344f, 52f, Anchor.CENTER)
         add(cancel, 562f, 330f, 90f, 44f, Anchor.CENTER)
         add(dismiss, 642f, 408f, 44f, 44f, Anchor.CENTER)
 
         back.setOnClickListener { onBack() }
         log.setOnClickListener { onLog() }
+        settings.setOnClickListener { onScreen(Screen.SETTINGS) }
+        map.setOnClickListener { onScreen(Screen.MAP) }
+        observations.setOnClickListener { onScreen(Screen.OBSERVATIONS) }
+        radar.setOnClickListener { onScreen(Screen.RADAR) }
+        radarTap.setOnClickListener { onScreen(Screen.RADAR) }
+        setup.setOnClickListener { onScreen(Screen.SETUP) }
+        sessions.setOnClickListener { onScreen(Screen.SESSIONS) }
         takeoffLand.setOnClickListener { pending = if (state.airborne == true) FlightAction.LAND else FlightAction.TAKEOFF; applyState() }
         rth.setOnClickListener { if (state.rthActive) onAction(FlightAction.STOP_RTH) else { pending = FlightAction.RTH; applyState() } }
         shutterButton.setOnClickListener { onAction(FlightAction.PHOTO) }
@@ -154,7 +173,7 @@ class HudView(context: Context) : ViewGroup(context) {
 
         menu.icon = if (menuOpen) Hud.close else Hud.menu
         menu.contentDescription = if (menuOpen) "Close menu" else "Menu"
-        for (v in listOf(map, observations, log)) v.visibility = if (menuOpen) VISIBLE else GONE
+        for (v in listOf(map, observations, log, radar, setup, sessions)) v.visibility = if (menuOpen) VISIBLE else GONE
         invalidate()
     }
 

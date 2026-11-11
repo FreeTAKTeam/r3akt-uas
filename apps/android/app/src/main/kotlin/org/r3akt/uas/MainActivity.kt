@@ -19,6 +19,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import org.r3akt.uas.hud.HudState
 import org.r3akt.uas.hud.HudView
+import org.r3akt.uas.screens.Screen
+import org.r3akt.uas.screens.ScreenPage
+import org.r3akt.uas.screens.openScreen
 
 /** The flight cockpit: the HUD skin over the aircraft source and its live video. */
 class MainActivity : Activity() {
@@ -29,6 +32,8 @@ class MainActivity : Activity() {
     private var seq = 0u
     /** The last rejected action in full; the HUD strip shortens long DJI texts. */
     private var lastRejection: String? = null
+    /** The page open over the cockpit, if any; the cockpit keeps polling underneath. */
+    private var page: ScreenPage? = null
 
     private val tick = object : Runnable {
         override fun run() {
@@ -36,6 +41,8 @@ class MainActivity : Activity() {
                 .getOrElse { HudState(status = "SOURCE ERROR", simulated = false) }
             // An unchanged state is not redrawn: the HUD shares the main thread with the video view.
             if (state != hud.state) hud.state = state
+            SessionLog.onState(state)
+            page?.update(state)
             showVideo(state.video)
             handler.postDelayed(this, Variant.source.periodMs)
         }
@@ -58,11 +65,13 @@ class MainActivity : Activity() {
         hud = HudView(this)
         hud.onBack = { finish() }
         hud.onLog = ::showReport
+        hud.onScreen = ::open
         hud.onAim = Variant.source.aimAction()?.let { action -> { action(this, hud) } }
         // Sent once, on the tap; a rejection is shown and never queued or retried (UAS-FLT-004, UAS-FLT-005).
         hud.onAction = { action ->
             Variant.source.perform(action) { error ->
                 runOnUiThread {
+                    SessionLog.onAction(action, error)
                     if (error != null && !isDestroyed) {
                         val title = "${action.name.replace('_', ' ')} REJECTED · NOT RETRIED"
                         lastRejection = "$title\nDJI: $error"
@@ -73,6 +82,7 @@ class MainActivity : Activity() {
         }
         root = FrameLayout(this).apply { addView(hud) }
         setContentView(root)
+        SessionLog.start(this, Variant.source.name)
         // Android 17 makes INTERNET a runtime permission; DJI registration needs it on first run.
         if (checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {
             Variant.source.start(this)
@@ -96,6 +106,30 @@ class MainActivity : Activity() {
     override fun onPause() {
         handler.removeCallbacks(tick)
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        closePage()
+        SessionLog.end()
+        super.onDestroy()
+    }
+
+    private fun open(screen: Screen) {
+        closePage()
+        page = openScreen(screen, this, ::closePage).also {
+            root.addView(it.view, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+            it.update(hud.state)
+        }
+    }
+
+    private fun closePage() {
+        page?.let { it.close(); root.removeView(it.view) }
+        page = null
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (page != null) closePage() else @Suppress("DEPRECATION") super.onBackPressed()
     }
 
     private fun hideSystemBars() {

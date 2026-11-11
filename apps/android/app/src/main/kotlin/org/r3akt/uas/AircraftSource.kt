@@ -34,6 +34,9 @@ interface AircraftSource {
     /** What a tap on the aim cross does, on the cockpit activity and its HUD; null when markers are not offered. */
     fun aimAction(): ((android.app.Activity, org.r3akt.uas.hud.HudView) -> Unit)? = null
 
+    /** Contacts for the radar and the map; empty when this source has none. */
+    fun contacts(): List<Contact> = emptyList()
+
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null
 }
