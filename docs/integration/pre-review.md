@@ -144,6 +144,21 @@ One fresh reviewer read the uncommitted re-pin and encoder switch, commit `b0837
 | Q4 | nit | Without a team UID, markers reach RCH but not REM. | Stated in the evidence. |
 | Q5 | nit | G-23 did not cite the merge of RCH #316. | Added. |
 
+## Focused PRE: DJI field-trial build, revision 1 (10 November 2026)
+
+One fresh reviewer read [the DJI field-trial plan](../goals/dji-net/PLAN.md) against the code at `e4417ca` (RCH `d7ad6e17`). Verdict: **blocked** by two findings: D-4 permits publishing from `simNet` only, and the flavours would share one identity. Revision 2 applies every engineering finding; the owner decisions are open.
+
+| # | Severity | Finding | Resolution in revision 2 |
+|---|---|---|---|
+| 1 | blocker | D-4 allows only `simNet` to publish. | Owner decision D-18 (amend D-4). |
+| 2 | blocker | The flavours share one application ID, so `dji4Net` would reuse simNet's identity, its "SIMULATED UAS" create and its marker list. | A store directory per flavour; new kill criterion. |
+| 3 | major | No receive time on DJI state; a stale position could be sent as fresh. | `Dji4Sdk` records receive times; `dji_sample` refuses state older than 2 s; kill criterion. |
+| 4 | major | Gimbal yaw and GPS level are not exposed, but `dji4` was read-only. | `apps/android/dji4/` added to tasks 3 and 4. |
+| 5 | major | The flavour shape was not written down (duplicate `Variant`, manifest, key placeholder). | `dji4Common`, the publisher as a wrapper, the `dji4Net` manifest and `beforeVariants` sets spelled out. |
+| 6 | major | Stop-on-pause fires for DJI's USB accessory activity. | D-16 now covers the cockpit activity only. |
+| 7 | major | The publication rate was set by the 10 Hz poll. | A Rust rate decision per UAS-VID-005, with tests. |
+| 8–12 | minor | `encode_telemetry` refusal on `None`; nullable camera pose; GPS signal gate; CI publish build; hub-down check and course threshold. | Applied in tasks 1–4; the GPS gate is in D-15. |
+
 ## Gate status
 
 - Milestone 1 (specification and scaffold): complete. The `ci` workflow builds from a clone on GitHub and passed, and the dji4 variant runs on a Pixel 7 (see the records in [acceptance.md](../specification/acceptance.md)).
