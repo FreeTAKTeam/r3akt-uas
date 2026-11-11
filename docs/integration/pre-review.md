@@ -87,8 +87,37 @@ One fresh reviewer read tasks 2 to 5 (commits `1978e2c`, `37e4a78`, `9eb6a82`, `
 | F9 | minor | The worker loop has no host test. | — | Accepted; the hub trace covers it. |
 | F10 | minor | Speed, course and accuracy are always sent; the simulator has them, a DJI source may not. | yes (`telemetry.rs`) | Noted at G-07: `TelemetrySample` needs optional values before a DJI source publishes (M3). |
 
+## Focused PRE: milestone 2 step 2b plan, revision 1 (10 November 2026)
+
+Two fresh reviewers read [the step 2b plan](../goals/m2-vertical-slice/PLAN-2b.md): one on readiness, one on buildability against RCH `f5822210`, LXMF-rs `9b972f9a` and REM `0cfa422`. Both returned **partially aligned, no blocker**. Nothing was built or run by them. "Checked" means re-read in the pinned source after the review.
+
+| # | Severity | Finding | Checked | Applied in revision 2 |
+|---|---|---|---|---|
+| B1, B2 | major | Membership is not matched by the app's identity hash: the hub records `reticulumd` announces with no identity hash, so both sender and REM recipients are matched by their `lxmf.delivery` hashes. The planned REM member (identity hash) would relay to nobody, and the identity-hash task is unnecessary. | yes (`r3akt-rch-server/src/lib.rs:2653`, `rem_team_directory.rs:81-110, 201-215`) | Members are added by delivery hash; the identity-hash task is dropped. |
+| R1 | major | "Correct position" overstated what REM shows: it settles at the relayed metadata position and does not follow the orbit. | yes (`sensor_telemetry.rs:117-124`, `sensor_relay_metadata.rs`) | Intent, outcome and evidence reworded; kill criterion against presenting REM evidence as tracking; acceptance records "appearance only". |
+| R2 | major | The riskiest assumption (REM applies a team-relayed object message) was proven last. | yes (REM `map_marker_receive.rs`, no R3S test in REM or RCH) | New task 0: REM relay spike with a stop rule, before any code. |
+| R3, B7 | major | Relay dispatch drops a queued snapshot that is no longer current; at 1 Hz with a lagging dispatch REM may receive nothing. | yes (`outbound.rs:43-60`, `sensor_telemetry.rs:357-389`) | Known limit; the relay trace records dispatch rejections; an interval option only if the proof needs it. |
+| R4 | major | Hub database and app store state for the proof were unspecified. | partly | D-8: fresh hub and store, plus one run with the 2a store. |
+| R5 | major | Hub and REM setup steps, operator, REM device and address were not named. | yes (`rem_team_directory.rs:45-52, 201-214`) | Task 0 names revisions, emulator address, operator and the exact calls. |
+| R6–R16, B3–B6, B8–B10 | minor | Upper-case team UIDs relay to nobody; `publish_start` signature change breaks simNet between tasks; incomplete task 1 file list (README, compatibility matrix); profile carrier table lacks field 11; mixed REM LXMF-rs revision; REM restart limit; UAS-PRF-008 belongs to the REM proof; further owner decisions; spike claims unrecorded; take-off-relative and unknown altitude cases; device clock behind the stored fix; LXMF-rs APIs unchanged (no action); Rust 1.89 compatible; no wire code forced here. | mostly | All applied as plan text (D-7 to D-9, file lists, tests, known limits). |
+
+## POST: milestone 2b tasks 0 to 3 (10 November 2026)
+
+A fresh reviewer read commits `eaddade` to `e16d135`, the evidence and the pinned shared sources, and ran the feature tests and clippy. Verdict: **partially aligned, no blocker.** No kill criterion is hit: fields 3, 11 and 13 come only from `encode_object_fields`, the no-team path is the 2a code unchanged, there is no receive path, the publisher stays behind `publish`/`simNet`, there is one marker and one origin per identity, and REM evidence is described as appearance only.
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| P1 | major | "No relay dispatch was rejected" was argued from daemon receipts; RCH records rejections in its own broker store. | Checked in both hub databases: every dispatch `terminal`/`delivered`, no `rejected` message record, and distinct fixes = relays per object (86, 18; spike 118). Evidence amended; the spike's mid-run "95/1" figure corrected. |
+| P2 | major | REM after the force-stop and relaunch, and after the 2a-store run, were text only. | Screenshots added (Markers 1 at 4:15, Markers 2 at 4:21). |
+| P3 | minor | "Same moment" was loose. | Reworded: hub origin at the end of run 2. |
+| P4 | minor | D-7 was narrowed to a 32-hex check after the ruling; the plan row contradicted it and the cost was not listed. | Plan row fixed; known limit added; the owner confirmed the narrowed D-7 and the shared list is requested as RCH #312. |
+| P5 | minor | Task 1 evidence only in the commit message. | `docs/evidence/m2b-task1-repin.md`. |
+| P6 | minor | No byte-equality test for the no-team path. | Plan wording relaxed to "2a code path unchanged (key set {13})"; the path is unchanged by inspection. |
+| P7 | minor | Stale `c2bf78a` references and gate status. | Profile baseline note, R3S contract link, reuse matrix RCH service row, `rch-rem-changes.md` ordering note and this gate status updated. |
+| P8 | minor | Encoder failures on the team path are labelled `Invalid`. | Accepted (label only). |
+
 ## Gate status
 
 - Milestone 1 (specification and scaffold): complete. The `ci` workflow builds from a clone on GitHub and passed, and the dji4 variant runs on a Pixel 7 (see the records in [acceptance.md](../specification/acceptance.md)).
 - PRE gate for milestone 2a: **passed on 10 November 2026.** The two blockers of the first focused PRE were ruled on by the owner, the second pass found no blocker, and its corrections are applied in plan revision 3. The POST review of the task 5 hub evidence (above) found no blocker; its corrections are applied and task 6 may start.
-- Milestone 2b (REM) and milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE (PRE finding 1).
+- Milestone 2b (REM): PRE passed; owner rulings D-5 to D-9 taken; tasks 0 to 3 done and the POST review above found no blocker (corrections applied). Task 4 (simNet device proof) may start. Milestones 3 to 6 remain gated outlines; each needs its own task plan and PRE.

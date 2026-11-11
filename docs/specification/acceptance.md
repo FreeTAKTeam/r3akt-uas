@@ -38,7 +38,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRD-003 | 4, 6 | Compatibility matrix with physically tested rows | specified |
 | UAS-PRD-004 | 4 | Hardware flight evidence per action | implemented but unproven (take-off, landing, RTH, photo, video preview); recording and gimbal control specified |
 | UAS-PRD-005 | 4 | Radar evidence (see Radar) | specified |
-| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | proven in scope (step 2a: RCH store and API, [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence; the map view at `c2bf78a` is blocked by G-20 and shown against RCH `cc6ca164`, [map evidence](../evidence/m2a-rch-map-cc6ca164.md)); REM specified |
+| UAS-PRD-006 | 2, 3 | RCH map evidence (step 2a); REM recipient-side evidence (step 2b and milestone 3) | proven in scope (step 2a: RCH store and API, [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence; the map view at `c2bf78a` is blocked by G-20 and shown against RCH `cc6ca164`, [map evidence](../evidence/m2a-rch-map-cc6ca164.md)); REM: proven in scope for step 2b, appearance only — the aircraft appears once in REM `0cfa422` at the relayed position and does not follow it until REM #341 ([host](../evidence/m2b-task3-host-proof-rem.md), [Pixel 7](../evidence/m2b-task4-device-proof.md)) |
 | UAS-PRD-007 | 5 | TCP and RNode operation evidence | specified |
 | UAS-PRD-008 | 5 | Detection promotion evidence | specified |
 | UAS-PRD-009 | 5 | MediaMTX playback evidence | specified |
@@ -54,7 +54,7 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-ARC-008 | 1–5 | Architecture review at each milestone gate | specified |
 | UAS-ARC-002 | 1 | `scripts/check_boundaries.py` passes (dependency-level guard; code review covers hand-written codecs) | scaffold-proven (dependencies) |
 | UAS-ARC-009 | 1 | Git revisions in `Cargo.toml`; committed `Cargo.lock`, `libs.versions.toml` | scaffold-proven |
-| UAS-ARC-010 | 1, 2 | Reuse matrix: inspected column filled (1); qualified column filled after integration tests (2) | proven in scope (RCH `c2bf78a` and LXMF-rs `888355c` qualified by the step 2a proofs) |
+| UAS-ARC-010 | 1, 2 | Reuse matrix: inspected column filled (1); qualified column filled after integration tests (2) | proven in scope (RCH `c2bf78a` and LXMF-rs `888355c` qualified by the step 2a proofs); RCH `f5822210` and LXMF-rs `9b972f9a` qualified by the step 2b proofs |
 | UAS-ARC-011 | 1 | Generated `native-bridge` Kotlin; emulator round trip | scaffold-proven; step 2a `simNet` calls the generated `publish_*` bindings on a Pixel 7 |
 | UAS-PRF-001 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | specified |
 | UAS-PRF-002 | 2, 3 | Shared-crate fixtures, identity/ordering tests, RCH/REM recipient evidence | proven in scope (step 2a, RCH: app identity and object id persist across force-stop and relaunch; [host](../evidence/m2a-task5-hub-host-proof.md) and [Pixel 7](../evidence/m2a-task6-device-proof.md) hub evidence); REM specified |
@@ -117,6 +117,10 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 - Operator view: the simulator APK on an API 35 x86_64 emulator shows sample 0 encoded by the shared `r3akt-map-core` encoder (90 bytes) and decoded by the shared decoder: [screenshot](../evidence/scaffold-sim-emulator-api35.png).
 - DJI 4 variant: it failed to start with `ClassNotFoundException: dji.sdk.sdkmanager.DJISDKManager`. The cause recorded here at the time (no x86_64 native libraries) was wrong: a static initializer used a DJI class before the SDK's class loader was installed. Corrected in the milestone 4 record below.
 - Receiving-client evidence (RCH map, REM) does not apply to the scaffold: nothing is published. It is the milestone 2 gate (RCH map in step 2a, REM in step 2b).
+
+## Milestone 2b evidence record (10 November 2026)
+
+Step 2b's evidence is captured; the milestone awaits owner acceptance. The same simulated aircraft, published as the shared object message with RCH team BLUE (`encode_object_fields`, fields 3, 11 and 13) from the host tool and from the `simNet` build on a Pixel 7, is relayed by RCH `f5822210` to an unchanged REM `0cfa422` on the emulator. REM shows each aircraft exactly once, at the position relayed with the marker metadata, through publisher restarts, replays, a force-stop and a REM relaunch; it does not follow the orbit until REM #341 (appearance only, D-6). Evidence: [REM spike](../evidence/m2b-task0-rem-relay-spike.md), [re-pin](../evidence/m2b-task1-repin.md), [host proof](../evidence/m2b-task3-host-proof-rem.md), [Pixel 7 proof](../evidence/m2b-task4-device-proof.md); reviews in [pre-review.md](../integration/pre-review.md).
 
 ## Milestone 2a evidence record (10 November 2026)
 

@@ -5,9 +5,10 @@
 //! uas-sim --check FILE [...]   exit non-zero unless FILE matches the output
 //!
 //! Built with `--features publish` only (milestone 2a, host proof):
-//! `uas-sim --publish HOST:PORT HUB_DEST --store DIR [--seconds N] [--resend-at N]`
+//! `uas-sim --publish HOST:PORT HUB_DEST --store DIR [--seconds N] [--resend-at N] [--team UID]`
 //!   flies the orbit at 1 Hz with wall-clock fix times and publishes it to RCH;
-//!   `--resend-at N` re-sends the last fix's exact bytes once after N seconds.
+//!   `--resend-at N` re-sends the last fix's exact bytes once after N seconds;
+//!   `--team UID` sends the shared object message with that RCH team (step 2b).
 //!   Prints the publisher status as one JSON line per second.
 
 use std::fmt::Write as _;
@@ -103,12 +104,13 @@ fn publish(args: &[String]) -> Result<(), String> {
     let hub = it
         .next()
         .ok_or("--publish needs the hub destination hash")?;
-    let (mut store, mut seconds, mut resend_at) = (None, 60_u32, None);
+    let (mut store, mut seconds, mut resend_at, mut team) = (None, 60_u32, None, None);
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let mut value = || it.next().ok_or(format!("{arg} needs a value"));
         match arg.as_str() {
             "--store" => store = Some(value()?.clone()),
+            "--team" => team = Some(value()?.clone()),
             "--seconds" => seconds = value()?.parse().map_err(|_| "--seconds needs a number")?,
             "--resend-at" => {
                 resend_at = Some(
@@ -121,7 +123,7 @@ fn publish(args: &[String]) -> Result<(), String> {
         }
     }
     let store = store.ok_or("--publish needs --store DIR")?;
-    p::publish_start(store, address.clone(), hub).map_err(|e| e.to_string())?;
+    p::publish_start(store, address.clone(), hub, team).map_err(|e| e.to_string())?;
     for seq in 0..seconds {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -151,6 +153,7 @@ fn status_json(s: &r3akt_uas_app::publish::PublishStatus) -> Value {
         "state": format!("{:?}", s.state),
         "destination_hash": s.destination_hash,
         "object_id": s.object_id,
+        "team_uid": s.team_uid,
         "hub_connected": s.hub_connected,
         "create_sent": s.create_sent,
         "fixes_sent": s.fixes_sent,

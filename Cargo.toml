@@ -4,7 +4,7 @@ resolver = "3"
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 license = "EPL-2.0"
 repository = "https://github.com/FreeTAKTeam/r3akt-uas"
 publish = false
@@ -12,14 +12,14 @@ publish = false
 # Shared R3AKT libraries, pinned to the inspected baselines in docs/goals/bootstrap/PLAN.md.
 # Do not replace these with local implementations (see AGENTS.md).
 [workspace.dependencies]
-r3akt-map-core = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0" }
+r3akt-map-core = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "f5822210da63ce303ee86ffa95d67e0db5e12b3d" }
 # Milestone 2a publication path, used only behind r3akt-uas-app's `publish` feature.
-# One LXMF-rs revision: the one RCH c2bf78a pins (decision D-1).
-r3akt-profile-rch = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0" }
-lxmf-sdk = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879", default-features = false, features = ["std"] }
-lxmf-runtime = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879" }
-reticulum-rs-transport = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879" }
-reticulum-rs-core = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "888355c580932f886cfbf9f7076758b065a69879" }
+# One LXMF-rs revision: the one RCH f5822210 pins (decision D-5, milestone 2b).
+r3akt-profile-rch = { git = "https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git", rev = "f5822210da63ce303ee86ffa95d67e0db5e12b3d" }
+lxmf-sdk = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1", default-features = false, features = ["std"] }
+lxmf-runtime = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }
+reticulum-rs-transport = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }
+reticulum-rs-core = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1" }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 base64 = "0.22"
 rand_core = { version = "0.6.4", features = ["getrandom"] }

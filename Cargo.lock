@@ -750,9 +750,9 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.38.2"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1d20bef17f513b9b3004532233187769cd072d790971f4e4da0e346eb6401e8"
+checksum = "14a5f01b87b92705d07b433c06f96cbc764637d81a0bffb5734ce17cf0f9a2b3"
 dependencies = [
  "cc",
  "pkg-config",
@@ -788,8 +788,8 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "lxmf-propagation"
-version = "0.16.0"
-source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=888355c580932f886cfbf9f7076758b065a69879#888355c580932f886cfbf9f7076758b065a69879"
+version = "0.16.1"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1#9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1"
 dependencies = [
  "hex",
  "hkdf",
@@ -806,16 +806,16 @@ dependencies = [
 
 [[package]]
 name = "lxmf-reference"
-version = "0.16.0"
-source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=888355c580932f886cfbf9f7076758b065a69879#888355c580932f886cfbf9f7076758b065a69879"
+version = "0.16.1"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1#9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "lxmf-runtime"
-version = "0.16.0"
-source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=888355c580932f886cfbf9f7076758b065a69879#888355c580932f886cfbf9f7076758b065a69879"
+version = "0.16.1"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1#9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1"
 dependencies = [
  "base64",
  "hex",
@@ -834,8 +834,8 @@ dependencies = [
 
 [[package]]
 name = "lxmf-sdk"
-version = "0.16.0"
-source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=888355c580932f886cfbf9f7076758b065a69879#888355c580932f886cfbf9f7076758b065a69879"
+version = "0.16.1"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1#9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1"
 dependencies = [
  "hex",
  "hmac",
@@ -850,8 +850,8 @@ dependencies = [
 
 [[package]]
 name = "lxmf-wire"
-version = "0.16.0"
-source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=888355c580932f886cfbf9f7076758b065a69879#888355c580932f886cfbf9f7076758b065a69879"
+version = "0.16.1"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1#9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -1068,7 +1068,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 [[package]]
 name = "r3akt-map-core"
 version = "0.1.0"
-source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0#c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0"
+source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=f5822210da63ce303ee86ffa95d67e0db5e12b3d#f5822210da63ce303ee86ffa95d67e0db5e12b3d"
 dependencies = [
  "base64",
  "chrono",
@@ -1083,7 +1083,7 @@ dependencies = [
 [[package]]
 name = "r3akt-profile-rch"
 version = "0.1.0"
-source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0#c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0"
+source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=f5822210da63ce303ee86ffa95d67e0db5e12b3d#f5822210da63ce303ee86ffa95d67e0db5e12b3d"
 dependencies = [
  "r3akt-protocol",
  "rmp-serde",
@@ -1097,7 +1097,7 @@ dependencies = [
 [[package]]
 name = "r3akt-protocol"
 version = "0.1.0"
-source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0#c2bf78adc2795574a5fb8c39e6cdea7e523b7ef0"
+source = "git+https://github.com/FreeTAKTeam/Reticulum-Community-Hub.git?rev=f5822210da63ce303ee86ffa95d67e0db5e12b3d#f5822210da63ce303ee86ffa95d67e0db5e12b3d"
 dependencies = [
  "chrono",
  "rmp-serde",
@@ -1152,8 +1152,8 @@ dependencies = [
 
 [[package]]
 name = "reticulum-rs-core"
-version = "0.16.0"
-source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=888355c580932f886cfbf9f7076758b065a69879#888355c580932f886cfbf9f7076758b065a69879"
+version = "0.16.1"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1#9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1"
 dependencies = [
  "aes",
  "atomicwrites",
@@ -1173,8 +1173,8 @@ dependencies = [
 
 [[package]]
 name = "reticulum-rs-transport"
-version = "0.16.0"
-source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=888355c580932f886cfbf9f7076758b065a69879#888355c580932f886cfbf9f7076758b065a69879"
+version = "0.16.1"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1#9b972f9a8d3a7949eae89bc78f7a9691f06f3ed1"
 dependencies = [
  "aes",
  "base64",
@@ -1250,9 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.40.2"
+version = "0.41.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23f2a97da3e3873c73cb2a2e71b35c40ff95e0b1eefa8d72d8499a6928c3b5b3"
+checksum = "da9bba6f3506135e120a6586df05be18b48d18896600646a4bec8f993d91a594"
 dependencies = [
  "bitflags 2.13.2",
  "fallible-iterator",
