@@ -62,8 +62,12 @@ class PublishingSource(
     }
 
     override fun logAction(): Pair<String, (Activity) -> Unit> =
-        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, worker).show() }
+        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, ownMarkers).show() }
         else "START PUBLISH" to { _ -> startPublishing() }
+
+    private val ownMarkers = BridgeMarkerOps(worker) { publishing }
+
+    override fun markerOps(): MarkerOps = ownMarkers
 
     // Markers are stored by the publisher, so placing one needs publishing on.
     override fun aimAction(): (Activity, HudView) -> Unit = { activity, hud ->

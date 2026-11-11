@@ -101,4 +101,6 @@ dependencies {
     implementation(project(":native-bridge"))
     "dji4Implementation"(project(":dji4"))
     "dji4NetImplementation"(project(":dji4"))
+    testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 }

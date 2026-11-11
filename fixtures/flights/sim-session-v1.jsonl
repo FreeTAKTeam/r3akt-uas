@@ -1,0 +1,13 @@
+{"type":"session","seq":0,"time_ms":1793750400000,"format":"r3akt-uas-session/1","session_id":"3f1c2a9e-5b7d-4e8a-9c61-0d2b7f4e8a15","variant":"simulator","simulated":true}
+{"type":"status","seq":1,"time_ms":1793750400412,"status":"IN FLIGHT"}
+{"type":"airborne","seq":2,"time_ms":1793750400412,"airborne":true}
+{"type":"rth","seq":3,"time_ms":1793750400412,"active":false}
+{"type":"flight_mode","seq":4,"time_ms":1793750400412,"mode":null}
+{"type":"fix","seq":5,"time_ms":1793750400412,"lat":45.00179864072745,"lon":7.0,"alt_m":400.0,"alt_ref":"MSL"}
+{"type":"fix","seq":6,"time_ms":1793750405412,"lat":45.00173735353086,"lon":7.000658348198527,"alt_m":400.0,"alt_ref":"MSL"}
+{"type":"fix","seq":7,"time_ms":1793750410412,"lat":45.00155766856225,"lon":7.0012718310552975,"alt_m":400.0,"alt_ref":"MSL"}
+{"type":"fix","seq":8,"time_ms":1793750415412,"lat":45.0012718310553,"lon":7.001798640727449,"alt_m":400.0,"alt_ref":"MSL"}
+{"type":"fix","seq":9,"time_ms":1793750420412,"lat":45.00089932036372,"lon":7.002202876006419,"alt_m":400.0,"alt_ref":"MSL"}
+{"type":"fix","seq":10,"time_ms":1793750425412,"lat":45.00046552247556,"lon":7.002456988925977,"alt_m":400.0,"alt_ref":"MSL"}
+{"type":"fix","seq":11,"time_ms":1793750430412,"lat":45.0,"lon":7.002543662110595,"alt_m":400.0,"alt_ref":"MSL"}
+{"type":"end","seq":12,"time_ms":1793750433120}
