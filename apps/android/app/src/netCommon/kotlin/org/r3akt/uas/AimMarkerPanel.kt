@@ -18,10 +18,12 @@ import org.r3akt.uas.bridge.Affiliation
 import org.r3akt.uas.bridge.CameraPose
 import org.r3akt.uas.bridge.markerCreate
 import org.r3akt.uas.bridge.markerCreateAtCamera
+import org.r3akt.uas.bridge.markerCreateAtOffset
 import org.r3akt.uas.bridge.markerList
 import org.r3akt.uas.hud.Hud
 import org.r3akt.uas.hud.HudButton
 import org.r3akt.uas.hud.HudView
+import org.r3akt.uas.screens.RadarLogic
 import java.util.concurrent.Executor
 
 /**
@@ -30,12 +32,14 @@ import java.util.concurrent.Executor
  * With a camera pose the marker goes where the camera centre meets the ground, read when PLACE is
  * pressed; without one it goes at the aircraft position (D-15 (a)) and the panel says so.
  * Names follow the FreeTAKUAS Alpha–Zulu counter (D-11). Bridge calls run on [worker].
+ * With [offset] (range m, true bearing) from a radar pick (D-10 (b)) the marker goes there instead.
  */
 class AimMarkerPanel(
     private val activity: Activity,
     private val hud: HudView,
     private val worker: Executor,
     private val cameraPose: (() -> CameraPose?)?,
+    private val offset: Pair<Double, Double>? = null,
 ) {
     private val s = hud.unit
     private val label = activity.resources.getFont(R.font.rajdhani_bold)
@@ -73,8 +77,11 @@ class AimMarkerPanel(
             addView(text("NEW MARKER", 14f, Hud.GREEN, label), LinearLayout.LayoutParams(0, WRAP, 1f))
             addView(close, LinearLayout.LayoutParams(px(40f), px(40f)))
         })
-        val where = if (cameraPose != null) "AT THE AIM CROSS, READ WHEN PLACED"
-        else "AT THE AIRCRAFT POSITION · NO CAMERA POINT FROM THIS SOURCE"
+        val where = when {
+            offset != null -> "${RadarLogic.distance(offset.first)} AT ${RadarLogic.bearing(offset.second)} TRUE FROM THE AIRCRAFT · RADAR PICK"
+            cameraPose != null -> "AT THE AIM CROSS, READ WHEN PLACED"
+            else -> "AT THE AIRCRAFT POSITION · NO CAMERA POINT FROM THIS SOURCE"
+        }
         root.addView(text(where, 11f, Hud.DIM, mono).apply { setPadding(0, 0, 0, pad / 2) })
 
         root.addView(row("NAME", nameValue, null) { toggle(nameFold) }, rowParams())
@@ -143,7 +150,8 @@ class AimMarkerPanel(
         worker.execute {
             val result = runCatching {
                 val pose = cameraPose
-                if (pose == null) markerCreate(name, affiliation).name
+                if (offset != null) markerCreateAtOffset(name, affiliation, offset.second, offset.first).name
+                else if (pose == null) markerCreate(name, affiliation).name
                 else markerCreateAtCamera(name, affiliation, pose() ?: error("aircraft position unknown")).name
             }
             activity.runOnUiThread {

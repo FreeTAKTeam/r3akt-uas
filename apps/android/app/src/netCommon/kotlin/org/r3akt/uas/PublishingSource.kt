@@ -3,9 +3,14 @@ package org.r3akt.uas
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
 import org.r3akt.uas.bridge.CameraPose
+import org.r3akt.uas.bridge.OwnMarker
 import org.r3akt.uas.bridge.PublishState
 import org.r3akt.uas.bridge.TelemetrySample
+import org.r3akt.uas.bridge.markerList
 import org.r3akt.uas.bridge.publishOfferFix
 import org.r3akt.uas.bridge.publishStart
 import org.r3akt.uas.bridge.publishStatus
@@ -41,6 +46,8 @@ class PublishingSource(
     @Volatile private var startError: String? = null
     @Volatile private var lastSeq = 0u
     @Volatile private var lastFix: TelemetrySample? = null
+    /** The app's own markers as last read from its store, for the radar and the map. */
+    @Volatile private var markerCache: List<OwnMarker> = emptyList()
     // Start and stop run here, in order: stop can block for one send's path wait (POST F1).
     private val worker = Executors.newSingleThreadExecutor()
 
@@ -62,13 +69,38 @@ class PublishingSource(
     }
 
     override fun logAction(): Pair<String, (Activity) -> Unit> =
-        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, worker).show() }
+        if (publishing) "MARKERS" to { activity -> MarkerPanel(activity, ownMarkers).show() }
         else "START PUBLISH" to { _ -> startPublishing() }
+
+    private val ownMarkers = BridgeMarkerOps(worker) { publishing }
+
+    override fun markerOps(): MarkerOps = ownMarkers
 
     // Markers are stored by the publisher, so placing one needs publishing on.
     override fun aimAction(): (Activity, HudView) -> Unit = { activity, hud ->
         if (publishing) AimMarkerPanel(activity, hud, worker, cameraPose?.let { { pose(it) } }).show()
         else hud.alert = "NO MARKER · PUBLISHING OFF" to "Open LOG, tap START PUBLISH"
+    }
+
+    // Radar pick (D-10 (b)): the aim-cross naming flow, placed at the picked range and true bearing.
+    override fun radarPick(): (Activity, Double, Double) -> Unit = { activity, rangeM, bearingDeg ->
+        val hud = hudIn(activity.window.decorView)
+        if (publishing && hud != null) AimMarkerPanel(activity, hud, worker, null, rangeM to bearingDeg).show()
+        else Toast.makeText(activity, "NO MARKER · PUBLISHING OFF: open LOG, tap START PUBLISH", Toast.LENGTH_LONG).show()
+    }
+
+    private fun hudIn(v: View): HudView? = v as? HudView
+        ?: (v as? ViewGroup)?.let { g -> (0 until g.childCount).firstNotNullOfOrNull { hudIn(g.getChildAt(it)) } }
+
+    // Inner contacts (simulated ones in simNet) plus this app's markers. A marker placed from a
+    // simulated aircraft carries the "SIMULATED · " note prefix (markers.rs), so it counts as simulated.
+    override fun contacts(): List<Contact> = inner.contacts() + markerCache.map { m ->
+        Contact(
+            id = m.objectId, name = m.name, symbol = m.symbol, lat = m.lat, lon = m.lon,
+            source = "this app",
+            simulated = m.notes?.startsWith("SIMULATED") == true,
+            positionTimeMs = m.updatedMs, contactTimeMs = m.updatedMs, receivedTimeMs = null,
+        )
     }
 
     // The pose that belongs to the last offered fix, stamped with that fix's time.
@@ -101,6 +133,8 @@ class PublishingSource(
             lastFix = it
             publishOfferFix(it)
         }
+        // The store is read on the worker, like every other marker call.
+        worker.execute { markerCache = runCatching { markerList() }.getOrDefault(markerCache) }
         val status = publishStatus()
         return state.copy(status = "${state.status} · ${status.state.name} ${status.fixesSent}")
     }
@@ -127,4 +161,38 @@ class PublishingSource(
             (startError ?: s.lastError)?.let { appendLine("error $it") }
         }.trimEnd()
     }
+
+    override fun setupItems(): List<SetupItem> {
+        val s = publishStatus()
+        val error = startError ?: s.lastError
+        val missing = listOfNotNull(
+            "r3aktHubAddress".takeIf { BuildConfig.HUB_ADDRESS.isEmpty() },
+            "r3aktHubDestination".takeIf { BuildConfig.HUB_DESTINATION.isEmpty() },
+        )
+        return inner.setupItems() + listOf(
+            if (missing.isEmpty()) SetupItem("Hub", SetupState.OK, "${BuildConfig.HUB_ADDRESS}, destination ${BuildConfig.HUB_DESTINATION}")
+            else SetupItem("Hub", SetupState.PROBLEM, "Not set at build time: ${missing.joinToString()}"),
+            SetupItem(
+                "Hub publishing",
+                when {
+                    error != null || s.state == PublishState.FAILED -> SetupState.PROBLEM
+                    publishing && s.state == PublishState.SENT -> SetupState.OK
+                    else -> SetupState.WAITING
+                },
+                when {
+                    publishing -> "${s.state.name}, hub connected ${s.hubConnected}, fixes sent ${s.fixesSent}" +
+                        if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""
+                    stoppedByPause -> "Stopped when the cockpit paused; LOG → START PUBLISH"
+                    else -> "Off; LOG → START PUBLISH"
+                } + (error?.let { "\nError: $it" } ?: ""),
+            ),
+        )
+    }
+
+    override fun configItems() = inner.configItems() + listOf(
+        "Hub address" to BuildConfig.HUB_ADDRESS.ifEmpty { "not set (r3aktHubAddress)" },
+        "Hub destination" to BuildConfig.HUB_DESTINATION.ifEmpty { "not set (r3aktHubDestination)" },
+        "Team UID" to BuildConfig.TEAM_UID.ifEmpty { "none (r3aktTeamUid not set)" },
+        "App identity (destination hash)" to (publishStatus().destinationHash ?: "created on the first publish"),
+    )
 }

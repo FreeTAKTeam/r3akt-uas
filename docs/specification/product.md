@@ -27,4 +27,4 @@ Waypoint missions, advanced automated flight, DJI SDK 5, MAVLink (the [rns-mavli
 
 ## Screens
 
-Connection/setup, flight cockpit, map, radar, observations, recordings and session history, settings. The scaffold has only a status screen.
+Connection/setup, flight cockpit, map, radar, observations, recordings and session history, settings. All seven exist since 11 November 2026 and open from the cockpit; they are implemented but unproven with an aircraft. The map has no basemap yet, recordings and detection are not built, and contacts are the simulator's and this app's own markers only (G-17).

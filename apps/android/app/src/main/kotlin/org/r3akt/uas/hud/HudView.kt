@@ -13,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import org.r3akt.uas.R
+import org.r3akt.uas.screens.Screen
 import org.r3akt.uas.bridge.AltitudeReference
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -39,6 +40,8 @@ class HudView(context: Context) : ViewGroup(context) {
 
     var onBack: () -> Unit = {}
     var onLog: () -> Unit = {}
+    /** Opens a page over the cockpit. */
+    var onScreen: (Screen) -> Unit = {}
     var onAction: (FlightAction) -> Unit = {}
 
     /** Tap on the aim cross; null when this source cannot place markers. */
@@ -48,6 +51,10 @@ class HudView(context: Context) : ViewGroup(context) {
     /** The marker being named at the aim cross, as (name, colour); drawn until placed or cancelled. */
     var aimMarker: Pair<String, Int>? = null
         set(value) { field = value; invalidate() }
+
+    /** Contacts for the small radar, set on every cockpit poll. */
+    var contacts: List<org.r3akt.uas.Contact> = emptyList()
+        set(value) { if (value != field) { field = value; invalidate() } }
 
     /** The HUD scale and the screen y of the design's line [dy], for overlays laid out on the same grid. */
     val unit get() = s
@@ -72,15 +79,20 @@ class HudView(context: Context) : ViewGroup(context) {
         HudButton(context, { s }, label, icon, text, bare, shutter)
 
     private val back = button(Hud.back, bare = true).apply { contentDescription = "Back" }
-    private val settings = button(Hud.more, bare = true).apply { contentDescription = "Settings, not built yet"; isEnabled = false }
+    private val settings = button(Hud.more, bare = true).apply { contentDescription = "Settings" }
     private val flight = button(Hud.aircraft, "FLIGHT")
     private val takeoffLand = button(Hud.takeoff, "TAKEOFF")
     private val rth = button(Hud.home, "RTH")
     private val cameraMode = button(Hud.photo).apply { contentDescription = "Camera mode, not built yet"; isEnabled = false }
     private val shutterButton = button(null, shutter = true).apply { contentDescription = "Take photo" }
     private val menu = button(Hud.menu, "MENU")
-    private val map = button(Hud.map, "MAP").apply { contentDescription = "Map, not built yet"; isEnabled = false }
-    private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations, not built yet"; isEnabled = false }
+    private val map = button(Hud.map, "MAP").apply { contentDescription = "Map" }
+    private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations" }
+    private val radar = button(null, "RADAR").apply { contentDescription = "Radar" }
+    private val setup = button(null, "SETUP").apply { contentDescription = "Connection and setup" }
+    private val sessions = button(null, "HIST").apply { contentDescription = "Sessions and recordings" }
+    // Invisible: the small radar is drawn below; this only takes the tap.
+    private val radarTap = View(context).apply { contentDescription = "Open the radar"; isFocusable = true }
     private val log = button(Hud.log, "LOG").apply { contentDescription = "Session log" }
     private val slider = HudSlider(context, { s }, label)
     private val cancel = button(null, "CANCEL")
@@ -92,6 +104,7 @@ class HudView(context: Context) : ViewGroup(context) {
         setWillNotDraw(false)
         // First, so every other control drawn over the reticle area keeps its taps.
         add(aim, 381f, 206f, 198f, 128f, Anchor.CENTER)
+        add(radarTap, 12f, 368f, 156f, 156f, Anchor.LEFT)
         add(back, 0f, 0f, 44f, 40f, Anchor.LEFT)
         add(settings, 916f, 0f, 44f, 40f, Anchor.RIGHT)
         add(flight, 12f, 132f, 60f, 60f, Anchor.LEFT)
@@ -103,12 +116,22 @@ class HudView(context: Context) : ViewGroup(context) {
         add(map, 692f, 476f, 60f, 52f, Anchor.RIGHT)
         add(observations, 756f, 476f, 60f, 52f, Anchor.RIGHT)
         add(log, 820f, 476f, 60f, 52f, Anchor.RIGHT)
+        add(radar, 692f, 416f, 60f, 52f, Anchor.RIGHT)
+        add(setup, 756f, 416f, 60f, 52f, Anchor.RIGHT)
+        add(sessions, 820f, 416f, 60f, 52f, Anchor.RIGHT)
         add(slider, 308f, 266f, 344f, 52f, Anchor.CENTER)
         add(cancel, 562f, 330f, 90f, 44f, Anchor.CENTER)
         add(dismiss, 642f, 408f, 44f, 44f, Anchor.CENTER)
 
         back.setOnClickListener { onBack() }
         log.setOnClickListener { onLog() }
+        settings.setOnClickListener { onScreen(Screen.SETTINGS) }
+        map.setOnClickListener { onScreen(Screen.MAP) }
+        observations.setOnClickListener { onScreen(Screen.OBSERVATIONS) }
+        radar.setOnClickListener { onScreen(Screen.RADAR) }
+        radarTap.setOnClickListener { onScreen(Screen.RADAR) }
+        setup.setOnClickListener { onScreen(Screen.SETUP) }
+        sessions.setOnClickListener { onScreen(Screen.SESSIONS) }
         takeoffLand.setOnClickListener { pending = if (state.airborne == true) FlightAction.LAND else FlightAction.TAKEOFF; applyState() }
         rth.setOnClickListener { if (state.rthActive) onAction(FlightAction.STOP_RTH) else { pending = FlightAction.RTH; applyState() } }
         shutterButton.setOnClickListener { onAction(FlightAction.PHOTO) }
@@ -154,7 +177,7 @@ class HudView(context: Context) : ViewGroup(context) {
 
         menu.icon = if (menuOpen) Hud.close else Hud.menu
         menu.contentDescription = if (menuOpen) "Close menu" else "Menu"
-        for (v in listOf(map, observations, log)) v.visibility = if (menuOpen) VISIBLE else GONE
+        for (v in listOf(map, observations, log, radar, setup, sessions)) v.visibility = if (menuOpen) VISIBLE else GONE
         invalidate()
     }
 
@@ -529,6 +552,10 @@ class HudView(context: Context) : ViewGroup(context) {
         if (hdg == null) {
             // UAS-RAD-008: without aircraft heading the radar says so; phone heading is never used.
             write(c, "NO HEADING", cx, cy - 18 * s, 11f, Hud.AMBER, align = Paint.Align.CENTER)
+            // Contacts are then drawn north-up, and the aircraft as a dot with no direction.
+            write(c, "N", cx, cy - 66 * s, 11f, Hud.WHITE, align = Paint.Align.CENTER, spacing = 0f)
+            fill.color = Hud.WHITE
+            c.drawCircle(cx, cy, 5 * s, fill)
         } else {
             stroke(c, cx, cy - 62 * s, cx, cy, 0x8CFFFFFF.toInt(), 1.5f)
             for ((name, bearing) in listOf("N" to 0.0, "E" to 90.0, "S" to 180.0, "W" to 270.0)) {
@@ -536,16 +563,33 @@ class HudView(context: Context) : ViewGroup(context) {
                 write(c, name, cx + (70 * sin(a)).toFloat() * s, cy - (70 * cos(a)).toFloat() * s + 4 * s, 11f,
                     if (name == "N") Hud.WHITE else Hud.GREEN, align = Paint.Align.CENTER, spacing = 0f)
             }
+            path.reset()
+            path.moveTo(cx, cy - 8 * s)
+            path.lineTo(cx + 7 * s, cy + 8 * s)
+            path.lineTo(cx, cy + 4 * s)
+            path.lineTo(cx - 7 * s, cy + 8 * s)
+            path.close()
+            fill.color = Hud.WHITE
+            c.drawPath(path, fill)
         }
-        path.reset()
-        path.moveTo(cx, cy - 8 * s)
-        path.lineTo(cx + 7 * s, cy + 8 * s)
-        path.lineTo(cx, cy + 4 * s)
-        path.lineTo(cx - 7 * s, cy + 8 * s)
-        path.close()
-        fill.color = Hud.WHITE
-        c.drawPath(path, fill)
-        write(c, "500 m", cx, cy + 48 * s, 10f, Hud.GREEN, monospace = true, align = Paint.Align.CENTER)
+        val maxM = org.r3akt.uas.Prefs.radarRangeM(context).toDouble()
+        write(c, org.r3akt.uas.screens.RadarLogic.distance(maxM), cx, cy + 48 * s, 10f, Hud.GREEN, monospace = true, align = Paint.Align.CENTER)
+        // Contacts inside the range, north-up without heading; none without aircraft position (UAS-RAD-008).
+        val lat = state.latitudeDeg
+        val lon = state.longitudeDeg
+        if (lat == null || lon == null) {
+            write(c, "NO POSITION", cx, cy + 24 * s, 11f, Hud.AMBER, align = Paint.Align.CENTER)
+            return
+        }
+        val polar = contacts.map { k ->
+            FloatArray(2).also { android.location.Location.distanceBetween(lat, lon, k.lat, k.lon, it) }
+        }
+        val sel = org.r3akt.uas.screens.RadarLogic.select(polar.map { it[0].toDouble() }, maxM)
+        line.strokeWidth = 1f * s
+        for (i in sel.drawn) {
+            val (dx, dy) = org.r3akt.uas.screens.RadarLogic.project(polar[i][0].toDouble(), polar[i][1].toDouble(), hdg, maxM, 62.0 * s)
+            org.r3akt.uas.screens.ContactSymbol.draw(c, contacts[i].symbol, cx + dx.toFloat(), cy + dy.toFloat(), 3.5f * s, fill, line)
+        }
     }
 
     private fun drawTelemetry(c: Canvas, st: HudState) {
