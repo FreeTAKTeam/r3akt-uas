@@ -64,7 +64,7 @@ Recorded 10 November 2026 for branch `feat/dji-net`; plan: [DJI field-trial buil
 - **Change:** the announce now carries the display name `R3AKT UAS <first 8 of destination>` and REM's capabilities `r3akt`, `emergencymessages` and `telemetry`. The encoding is LXMF-rs `lxmf_core::announce::encode_delivery_announce_app_data_with_capabilities` (`lxmf-wire`, already in the lock at `9b972f9a`, added to the shared allowlist).
 - **Path responses:** a hub that asks for a path to the app received the transport's path-response announce, and that announce had no app data. On the local hub this second announce replaced the named one a second later. The app data is now registered with `set_destination_announce_app_data` when the destination is created, so path responses carry it too.
 - **Local hub (RCH `83b5d64a`), host publisher:** after the hub's next announce sync, `/api/rem/peers` lists `R3AKT UAS e8e70a1b` with `client_type rem` and the three capabilities, next to the REM emulator.
-- **R3AKT Server:** the Pixel's `dji4Net` connected and announced as `R3AKT UAS 84b40d98` (destination `84b40d986126dd2c67c3c935d9f55a24`). Whether it appears in that hub's REM peers is for the operator to see.
+- **R3AKT Server:** the Pixel's `dji4Net` connected and announced as `R3AKT UAS 84b40d98` (destination `84b40d986126dd2c67c3c935d9f55a24`). The owner confirmed it appeared in that hub's REM peers and added it to team BLUE (10 November 2026).
 - **Known effect (D-19):** the hub may now send the app REM traffic, for example Emergency Action Messages, which the app does not read (G-17).
 
 ## Not yet shown
