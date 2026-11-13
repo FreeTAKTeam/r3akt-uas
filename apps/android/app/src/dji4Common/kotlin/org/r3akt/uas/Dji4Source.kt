@@ -7,10 +7,12 @@ import org.r3akt.uas.bridge.AltitudeReference
 import org.r3akt.uas.bridge.TelemetrySample
 import org.r3akt.uas.bridge.djiSample
 import org.r3akt.uas.dji4.Dji4Action
+import org.r3akt.uas.dji4.Dji4CameraMode
 import org.r3akt.uas.dji4.Dji4Link
 import org.r3akt.uas.dji4.Dji4Loader
 import org.r3akt.uas.dji4.Dji4Sdk
 import org.r3akt.uas.dji4.Dji4VideoView
+import org.r3akt.uas.hud.CameraMode
 import org.r3akt.uas.hud.FlightAction
 import org.r3akt.uas.hud.HudState
 
@@ -35,6 +37,12 @@ object Dji4Source : AircraftSource {
             FlightAction.RTH -> Dji4Action.RTH
             FlightAction.STOP_RTH -> Dji4Action.STOP_RTH
             FlightAction.PHOTO -> Dji4Action.PHOTO
+            FlightAction.RECORD_START -> Dji4Action.RECORD_START
+            FlightAction.RECORD_STOP -> Dji4Action.RECORD_STOP
+            FlightAction.PHOTO_MODE -> Dji4Action.PHOTO_MODE
+            FlightAction.VIDEO_MODE -> Dji4Action.VIDEO_MODE
+            FlightAction.GIMBAL_DOWN -> Dji4Action.GIMBAL_DOWN
+            FlightAction.GIMBAL_LEVEL -> Dji4Action.GIMBAL_LEVEL
         },
         onResult,
     )
@@ -72,13 +80,28 @@ object Dji4Source : AircraftSource {
             gimbalPitchDeg = d.gimbalPitchDeg,
             flightTimeS = d.flightTimeS,
             video = connected,
+            cameraMode = when (d.cameraMode) {
+                Dji4CameraMode.PHOTO -> CameraMode.PHOTO
+                Dji4CameraMode.VIDEO -> CameraMode.VIDEO
+                null -> null
+            },
+            recording = d.recording,
+            recordingTimeS = d.recordingTimeS,
+            linkPercent = d.linkPercent,
             // UAS-FLT-002: an action is offered only while the aircraft reports a state that allows it.
             actions = buildSet {
                 if (d.flying == false) add(FlightAction.TAKEOFF)
                 if (d.flying == true) add(FlightAction.LAND)
                 if (d.flying == true && !d.goingHome && d.homeDistanceM != null) add(FlightAction.RTH)
                 if (d.goingHome) add(FlightAction.STOP_RTH)
-                if (connected && d.hasCamera) add(FlightAction.PHOTO)
+                // Camera actions follow the reported mode; while it is unknown none is offered.
+                if (connected && d.hasCamera && d.recording == false) when (d.cameraMode) {
+                    Dji4CameraMode.PHOTO -> { add(FlightAction.PHOTO); add(FlightAction.VIDEO_MODE) }
+                    Dji4CameraMode.VIDEO -> { add(FlightAction.RECORD_START); add(FlightAction.PHOTO_MODE) }
+                    null -> {}
+                }
+                if (connected && d.recording == true) add(FlightAction.RECORD_STOP)
+                if (connected && d.hasGimbal && d.gimbalPitchDeg != null) { add(FlightAction.GIMBAL_DOWN); add(FlightAction.GIMBAL_LEVEL) }
             },
         )
     }

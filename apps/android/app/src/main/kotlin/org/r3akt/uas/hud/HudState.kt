@@ -3,7 +3,15 @@ package org.r3akt.uas.hud
 import org.r3akt.uas.bridge.AltitudeReference
 
 /** Local flight actions; a button is enabled only when the source offers it (UAS-FLT-002). */
-enum class FlightAction { TAKEOFF, LAND, RTH, STOP_RTH, PHOTO }
+enum class FlightAction {
+    TAKEOFF, LAND, RTH, STOP_RTH, PHOTO,
+    RECORD_START, RECORD_STOP, PHOTO_MODE, VIDEO_MODE,
+    /** Gimbal pitch to -90° (straight down) or 0° (level); finer pitch stays on the controller's wheel. */
+    GIMBAL_DOWN, GIMBAL_LEVEL,
+}
+
+/** The camera's shooting mode as reported; anything else (playback, download) is unknown. */
+enum class CameraMode { PHOTO, VIDEO }
 
 /**
  * What the cockpit HUD shows. `null` means unknown and is drawn as a dash,
@@ -27,6 +35,11 @@ data class HudState(
     val gpsSatellites: Int? = null,
     val gimbalPitchDeg: Double? = null,
     val flightTimeS: Long? = null,
+    val cameraMode: CameraMode? = null,
+    val recording: Boolean? = null,
+    val recordingTimeS: Int? = null,
+    /** Aircraft-to-controller downlink quality as reported, 0..100. */
+    val linkPercent: Int? = null,
     val actions: Set<FlightAction> = emptySet(),
     /** True while a live video surface should sit behind the HUD. */
     val video: Boolean = false,
