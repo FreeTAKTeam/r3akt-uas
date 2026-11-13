@@ -24,13 +24,30 @@ object Dji4Source : AircraftSource {
     // The loader only: touching Dji4Sdk here, before the DJI classes exist, breaks its callbacks.
     override fun install(app: Application) = Dji4Loader.install(app)
 
-    override fun start(context: Context) = Dji4Sdk.start(context)
+    private var appContext: Context? = null
+
+    override fun start(context: Context) {
+        appContext = context.applicationContext
+        Dji4Sdk.start(context)
+    }
+
+    private fun streamUrl() = appContext?.let(Prefs::streamUrl)
 
     override fun describe() = Dji4Sdk.describe()
 
     override fun videoView(context: Context): View = Dji4VideoView(context)
 
-    override fun perform(action: FlightAction, onResult: (String?) -> Unit) = Dji4Sdk.perform(
+    override fun perform(action: FlightAction, onResult: (String?) -> Unit) = when (action) {
+        FlightAction.STREAM_START -> streamUrl()?.let { url ->
+            val q = appContext?.let(Prefs::streamQuality) ?: StreamQuality.LOW
+            Dji4Sdk.startStream(url, q.width, q.height, q.kbps, onResult)
+        }
+            ?: onResult("No video server set: SETTINGS → VIDEO SERVER")
+        FlightAction.STREAM_STOP -> Dji4Sdk.stopStream(onResult)
+        else -> flight(action, onResult)
+    }
+
+    private fun flight(action: FlightAction, onResult: (String?) -> Unit) = Dji4Sdk.perform(
         when (action) {
             FlightAction.TAKEOFF -> Dji4Action.TAKEOFF
             FlightAction.LAND -> Dji4Action.LAND
@@ -43,6 +60,7 @@ object Dji4Source : AircraftSource {
             FlightAction.VIDEO_MODE -> Dji4Action.VIDEO_MODE
             FlightAction.GIMBAL_DOWN -> Dji4Action.GIMBAL_DOWN
             FlightAction.GIMBAL_LEVEL -> Dji4Action.GIMBAL_LEVEL
+            FlightAction.STREAM_START, FlightAction.STREAM_STOP -> error("not a flight action")
         },
         onResult,
     )
@@ -88,6 +106,7 @@ object Dji4Source : AircraftSource {
             recording = d.recording,
             recordingTimeS = d.recordingTimeS,
             linkPercent = d.linkPercent,
+            streaming = d.streaming,
             // UAS-FLT-002: an action is offered only while the aircraft reports a state that allows it.
             actions = buildSet {
                 if (d.flying == false) add(FlightAction.TAKEOFF)
@@ -101,6 +120,8 @@ object Dji4Source : AircraftSource {
                     null -> {}
                 }
                 if (connected && d.recording == true) add(FlightAction.RECORD_STOP)
+                if (connected && !d.streaming && streamUrl() != null) add(FlightAction.STREAM_START)
+                if (d.streaming) add(FlightAction.STREAM_STOP)
                 if (connected && d.hasGimbal && d.gimbalPitchDeg != null) { add(FlightAction.GIMBAL_DOWN); add(FlightAction.GIMBAL_LEVEL) }
             },
         )

@@ -17,6 +17,9 @@ import dji.sdk.base.BaseProduct
 import dji.sdk.products.Aircraft
 import dji.sdk.sdkmanager.DJISDKInitEvent
 import dji.sdk.sdkmanager.DJISDKManager
+import dji.sdk.sdkmanager.LiveStreamManager
+import dji.sdk.sdkmanager.LiveVideoBitRateMode
+import dji.sdk.sdkmanager.LiveVideoResolution
 import org.r3akt.uas.bridge.AircraftPose
 import org.r3akt.uas.bridge.DjiFlightState
 import org.r3akt.uas.bridge.normalizeDji
@@ -62,6 +65,8 @@ data class Dji4State(
     val recordingTimeS: Int?,
     /** Downlink signal quality 0..100 as reported by the air link. */
     val linkPercent: Int?,
+    /** DJI's RTMP live stream is running. */
+    val streaming: Boolean,
 )
 
 /**
@@ -166,6 +171,8 @@ object Dji4Sdk {
         gimbalYawRelative = null
         camera = null
         linkQuality = null
+        // A stream never outlives its aircraft or restarts by itself on a reconnect.
+        runCatching { if (isStreaming()) liveStream?.stopStream() }
         if (link == Dji4Link.CONNECTED) link = Dji4Link.NO_AIRCRAFT
     }
 
@@ -215,6 +222,7 @@ object Dji4Sdk {
             recording = cam?.isRecording,
             recordingTimeS = cam?.takeIf { it.isRecording }?.currentVideoRecordingTimeInSeconds,
             linkPercent = linkQuality.takeIf { live },
+            streaming = live && isStreaming(),
         )
     }
 
@@ -276,6 +284,60 @@ object Dji4Sdk {
         }.onFailure { onResult(it.message ?: it.toString()) }
     }
 
+    // Live video (UAS-VID-001): DJI's RTMP push to the video server. Encoding stays off, so the
+    // aircraft's own H.264 is forwarded as it arrives: no phone re-encode, no added latency or CPU.
+    // No audio. The stream needs the primary feed open, which the cockpit's video view does.
+    @Volatile private var streamError: String? = null
+    private val liveStream get() = runCatching { DJISDKManager.getInstance().liveStreamManager }.getOrNull()
+
+    private val RESOLUTIONS = listOf(
+        LiveVideoResolution.VIDEO_RESOLUTION_480_360, LiveVideoResolution.VIDEO_RESOLUTION_720_540,
+        LiveVideoResolution.VIDEO_RESOLUTION_960_540, LiveVideoResolution.VIDEO_RESOLUTION_960_720,
+        LiveVideoResolution.VIDEO_RESOLUTION_1280_720, LiveVideoResolution.VIDEO_RESOLUTION_1280_960,
+        LiveVideoResolution.VIDEO_RESOLUTION_1440_1080, LiveVideoResolution.VIDEO_RESOLUTION_1920_1080,
+    )
+
+    private val onStreamError = LiveStreamManager.OnLiveErrorStatusListener { code, message ->
+        streamError = "code $code: ${message ?: "no message"}"
+    }
+
+    private fun isStreaming() = runCatching { liveStream?.isStreaming == true }.getOrDefault(false)
+
+    /**
+     * Starts the RTMP push to [url]; [onResult] gets `null` on success or the reason, possibly on another thread.
+     * With [width], [height] and [kbps] the phone re-encodes to that size and bitrate; with any of them null the
+     * aircraft's own H.264 is forwarded unchanged. A size DJI does not offer is refused, never substituted.
+     */
+    fun startStream(url: String, width: Int?, height: Int?, kbps: Int?, onResult: (String?) -> Unit) {
+        val encode = width != null && height != null && kbps != null
+        val resolution = if (encode) RESOLUTIONS.firstOrNull { it.width == width && it.height == height }
+            ?: return onResult("DJI offers no ${width}x$height live resolution") else null
+        val lsm = liveStream.takeIf { link == Dji4Link.CONNECTED } ?: return onResult("No aircraft connected")
+        thread(name = "dji-live-start") {
+            onResult(runCatching {
+                streamError = null
+                lsm.removeLiveErrorStatusListener(onStreamError)
+                lsm.addLiveErrorStatusListener(onStreamError)
+                lsm.setVideoEncodingEnabled(encode)
+                if (resolution != null && kbps != null) {
+                    lsm.setLiveVideoResolution(resolution)
+                    lsm.setLiveVideoBitRateMode(LiveVideoBitRateMode.MANUAL)
+                    lsm.setLiveVideoBitRate(kbps.toFloat()) // kbps, as getLiveVideoBitRate reports it
+                } else {
+                    lsm.setLiveVideoBitRateMode(LiveVideoBitRateMode.AUTO)
+                }
+                lsm.setAudioStreamingEnabled(false)
+                lsm.setLiveUrl(url)
+                // startStream blocks until the RTMP handshake; 0 is success.
+                lsm.startStream().takeIf { it != 0 }?.let { "Live stream not started, DJI code $it" }
+            }.getOrElse { it.message ?: it.toString() })
+        }
+    }
+
+    fun stopStream(onResult: (String?) -> Unit) {
+        onResult(runCatching { liveStream?.stopStream(); null }.getOrElse { it.message ?: it.toString() })
+    }
+
     private fun pitchTo(deg: Float) = Rotation.Builder().mode(RotationMode.ABSOLUTE_ANGLE).pitch(deg).time(1.0).build()
 
     // Read-only details for the setup page, as the SDK reports them; `null` = not reported.
@@ -311,6 +373,17 @@ object Dji4Sdk {
             // Recorded in the ground test (DJI plan task 4); shown as reported.
             if (s.link == Dji4Link.CONNECTED) {
                 append("\nCamera ${s.cameraMode ?: "mode not reported"}${if (flatMode) " (flat modes)" else ""}, recording ${s.recording ?: "-"}, link ${s.linkPercent ?: "-"}%")
+                val lsm = liveStream
+                if (s.streaming && lsm != null) {
+                    val encoded = runCatching { lsm.isVideoEncodingEnabled }.getOrDefault(false)
+                    val size = runCatching { lsm.liveVideoResolution?.let { "${it.width}x${it.height}" } }.getOrNull() ?: "-"
+                    append("\nLive stream: on, ${if (encoded) "re-encoded $size" else "aircraft H.264"}, ")
+                    append("${runCatching { lsm.liveVideoBitRate }.getOrNull() ?: "-"} kbps, ")
+                    append("${runCatching { lsm.liveVideoFps }.getOrNull() ?: "-"} fps, ${runCatching { lsm.streamTime }.getOrNull() ?: "-"} s")
+                } else {
+                    append("\nLive stream: off")
+                }
+                streamError?.let { append("\nLive stream error: $it") }
                 append("\nGPS level ${s.gpsLevel ?: "-"}, satellites ${s.satellites ?: "-"}")
                 append("\nGimbal yaw ${s.gimbalYawDeg ?: "-"}, relative to heading ${s.gimbalYawRelativeDeg ?: "-"}")
                 append("\n").append(Dji4VideoView.report())

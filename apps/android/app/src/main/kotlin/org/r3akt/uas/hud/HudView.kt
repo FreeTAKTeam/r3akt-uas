@@ -90,6 +90,7 @@ class HudView(context: Context) : ViewGroup(context) {
     private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations" }
     private val radar = button(null, "RADAR").apply { contentDescription = "Radar" }
     private val setup = button(null, "SETUP").apply { contentDescription = "Connection and setup" }
+    private val stream = button(null, "STREAM")
     private val sessions = button(null, "HIST").apply { contentDescription = "Sessions and recordings" }
     // Invisible: the small radar is drawn below; this only takes the tap.
     private val radarTap = View(context).apply { contentDescription = "Open the radar"; isFocusable = true }
@@ -122,6 +123,7 @@ class HudView(context: Context) : ViewGroup(context) {
         add(radar, 692f, 416f, 60f, 52f, Anchor.RIGHT)
         add(setup, 756f, 416f, 60f, 52f, Anchor.RIGHT)
         add(sessions, 820f, 416f, 60f, 52f, Anchor.RIGHT)
+        add(stream, 888f, 416f, 60f, 52f, Anchor.RIGHT)
         add(slider, 308f, 266f, 344f, 52f, Anchor.CENTER)
         add(cancel, 562f, 330f, 90f, 44f, Anchor.CENTER)
         add(dismiss, 642f, 408f, 44f, 44f, Anchor.CENTER)
@@ -140,6 +142,7 @@ class HudView(context: Context) : ViewGroup(context) {
         shutterButton.setOnClickListener { shutterAction()?.let(onAction) }
         cameraMode.setOnClickListener { onAction(if (state.cameraMode == CameraMode.VIDEO) FlightAction.PHOTO_MODE else FlightAction.VIDEO_MODE) }
         gimbalTap.setOnClickListener { onAction(gimbalAction()) }
+        stream.setOnClickListener { onAction(if (state.streaming) FlightAction.STREAM_STOP else FlightAction.STREAM_START) }
         slider.onConfirm = { pending?.let { pending = null; applyState(); onAction(it) } }
         cancel.setOnClickListener { pending = null; applyState() }
         dismiss.setOnClickListener { alert = null }
@@ -175,6 +178,11 @@ class HudView(context: Context) : ViewGroup(context) {
         cameraMode.isEnabled = (if (toVideo) FlightAction.VIDEO_MODE else FlightAction.PHOTO_MODE) in st.actions
         cameraMode.contentDescription = (if (toVideo) "Photo mode; switch to video" else "Video mode; switch to photo") +
             if (cameraMode.isEnabled) "" else ", unavailable"
+        stream.label = if (st.streaming) "STOP" else "STREAM"
+        stream.tone = if (st.streaming) HudButton.Tone.CAUTION else HudButton.Tone.NORMAL
+        stream.isEnabled = (if (st.streaming) FlightAction.STREAM_STOP else FlightAction.STREAM_START) in st.actions
+        stream.contentDescription = (if (st.streaming) "Stop the video stream" else "Stream video to the video server") +
+            if (stream.isEnabled) "" else ", unavailable"
         gimbalTap.isEnabled = gimbalAction() in st.actions
         gimbalTap.contentDescription = (if (gimbalAction() == FlightAction.GIMBAL_DOWN) "Point the gimbal down" else "Level the gimbal") +
             if (gimbalTap.isEnabled) "" else ", unavailable"
@@ -197,7 +205,7 @@ class HudView(context: Context) : ViewGroup(context) {
 
         menu.icon = if (menuOpen) Hud.close else Hud.menu
         menu.contentDescription = if (menuOpen) "Close menu" else "Menu"
-        for (v in listOf(map, observations, log, radar, setup, sessions)) v.visibility = if (menuOpen) VISIBLE else GONE
+        for (v in listOf(map, observations, log, radar, setup, sessions, stream)) v.visibility = if (menuOpen) VISIBLE else GONE
         invalidate()
     }
 
@@ -418,8 +426,12 @@ class HudView(context: Context) : ViewGroup(context) {
         val battery = st.batteryPercent
         cell("BAT", battery?.let { "$it%" } ?: "—", if (battery != null && battery <= 30) Hud.AMBER else Hud.WHITE)
         cell("LINK", st.linkPercent?.let { "$it%" } ?: "—", if (st.linkPercent != null && st.linkPercent <= 30) Hud.AMBER else Hud.WHITE)
-        cell("STRM", "OFF", Hud.DIM)
-        cell("MESH", "OFF", Hud.DIM)
+        if (st.streaming) cell("STRM", "LIVE", Hud.GREEN) else cell("STRM", "OFF", Hud.DIM)
+        when (st.mesh) {
+            true -> cell("MESH", "ON", Hud.GREEN)
+            false -> cell("MESH", "DOWN", Hud.AMBER)
+            null -> cell("MESH", "OFF", Hud.DIM)
+        }
         cell("GPS", st.gpsSatellites?.toString() ?: "—")
 
         // Battery bar under the top bar.
