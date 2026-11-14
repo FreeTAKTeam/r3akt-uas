@@ -34,6 +34,11 @@ class HudButton(
         set(value) { field = value; invalidate() }
     var tone = Tone.NORMAL
         set(value) { field = value; invalidate() }
+    /** Shutter only: red disc in video mode, red square while recording. */
+    var video = false
+        set(value) { field = value; invalidate() }
+    var recording = false
+        set(value) { field = value; invalidate() }
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
@@ -81,8 +86,14 @@ class HudButton(
             paint.color = frameColor
             canvas.drawCircle(w / 2, h / 2, w / 2 - 1.5f * k, paint)
             paint.style = Paint.Style.FILL
-            paint.color = if (dim) Hud.DIM else Hud.WHITE
-            canvas.drawCircle(w / 2, h / 2, w / 2 - 9 * k, paint)
+            paint.color = if (dim) Hud.DIM else if (video || recording) Hud.RED else Hud.WHITE
+            if (recording) {
+                val r = w / 2 - 20 * k
+                box.set(w / 2 - r, h / 2 - r, w / 2 + r, h / 2 + r)
+                canvas.drawRoundRect(box, 3 * k, 3 * k, paint)
+            } else {
+                canvas.drawCircle(w / 2, h / 2, w / 2 - 9 * k, paint)
+            }
             return
         }
 
@@ -260,6 +271,7 @@ object Hud {
         moveTo(5f, 9.5f); lineTo(5f, 20f); lineTo(19f, 20f); lineTo(19f, 9.5f)
         moveTo(10f, 12f); lineTo(10f, 18f); moveTo(14f, 12f); lineTo(14f, 18f); moveTo(10f, 15f); lineTo(14f, 15f)
     }
+    val video: Icon = { addRect(2f, 7f, 16f, 18f, Path.Direction.CW); moveTo(16f, 11f); lineTo(22f, 7.5f); lineTo(22f, 17.5f); lineTo(16f, 14f) }
     val photo: Icon = { addRect(3f, 7f, 21f, 20f, Path.Direction.CW); moveTo(8f, 7f); lineTo(10f, 4f); lineTo(14f, 4f); lineTo(16f, 7f); addCircle(12f, 13.5f, 3.5f, Path.Direction.CW) }
     val menu: Icon = { moveTo(4f, 6f); lineTo(20f, 6f); moveTo(4f, 12f); lineTo(20f, 12f); moveTo(4f, 18f); lineTo(20f, 18f) }
     val map: Icon = {

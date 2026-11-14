@@ -17,8 +17,8 @@ import java.util.Locale
 
 /**
  * Past cockpit sessions from the local session record (UAS-VID-008), newest first; a tap opens
- * one session's events. Aircraft video recordings and media download are not built, and this
- * page says so instead of listing anything.
+ * one session's events. Video is recorded on the aircraft's own card; media download is not
+ * built, and this page says so instead of listing anything.
  */
 class SessionsScreen(private val activity: Activity, close: () -> Unit) : ScreenPage {
     private val frame = PageFrame(activity, Screen.SESSIONS.title, close)
@@ -63,7 +63,8 @@ class SessionsScreen(private val activity: Activity, close: () -> Unit) : Screen
         }
         content.addView(title("RECORDINGS"))
         // UAS-VID-008, recordings part: nothing is listed until it exists.
-        content.addView(text("Not built yet: aircraft video recording and media download from the aircraft. " +
+        content.addView(text("Video records on the aircraft's own card (shutter in video mode); start and stop " +
+            "appear in the session events. Not built yet: listing or downloading media from the aircraft. " +
             "No recordings are kept by this app.", Hud.AMBER))
     }
 

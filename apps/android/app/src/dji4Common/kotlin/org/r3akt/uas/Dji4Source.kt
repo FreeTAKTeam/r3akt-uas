@@ -7,10 +7,12 @@ import org.r3akt.uas.bridge.AltitudeReference
 import org.r3akt.uas.bridge.TelemetrySample
 import org.r3akt.uas.bridge.djiSample
 import org.r3akt.uas.dji4.Dji4Action
+import org.r3akt.uas.dji4.Dji4CameraMode
 import org.r3akt.uas.dji4.Dji4Link
 import org.r3akt.uas.dji4.Dji4Loader
 import org.r3akt.uas.dji4.Dji4Sdk
 import org.r3akt.uas.dji4.Dji4VideoView
+import org.r3akt.uas.hud.CameraMode
 import org.r3akt.uas.hud.FlightAction
 import org.r3akt.uas.hud.HudState
 
@@ -22,19 +24,43 @@ object Dji4Source : AircraftSource {
     // The loader only: touching Dji4Sdk here, before the DJI classes exist, breaks its callbacks.
     override fun install(app: Application) = Dji4Loader.install(app)
 
-    override fun start(context: Context) = Dji4Sdk.start(context)
+    private var appContext: Context? = null
+
+    override fun start(context: Context) {
+        appContext = context.applicationContext
+        Dji4Sdk.start(context)
+    }
+
+    private fun streamUrl() = appContext?.let(Prefs::streamUrl)
 
     override fun describe() = Dji4Sdk.describe()
 
     override fun videoView(context: Context): View = Dji4VideoView(context)
 
-    override fun perform(action: FlightAction, onResult: (String?) -> Unit) = Dji4Sdk.perform(
+    override fun perform(action: FlightAction, onResult: (String?) -> Unit) = when (action) {
+        FlightAction.STREAM_START -> streamUrl()?.let { url ->
+            val q = appContext?.let(Prefs::streamQuality) ?: StreamQuality.LOW
+            Dji4Sdk.startStream(url, q.width, q.height, q.kbps, onResult)
+        }
+            ?: onResult("No video server set: SETTINGS → VIDEO SERVER")
+        FlightAction.STREAM_STOP -> Dji4Sdk.stopStream(onResult)
+        else -> flight(action, onResult)
+    }
+
+    private fun flight(action: FlightAction, onResult: (String?) -> Unit) = Dji4Sdk.perform(
         when (action) {
             FlightAction.TAKEOFF -> Dji4Action.TAKEOFF
             FlightAction.LAND -> Dji4Action.LAND
             FlightAction.RTH -> Dji4Action.RTH
             FlightAction.STOP_RTH -> Dji4Action.STOP_RTH
             FlightAction.PHOTO -> Dji4Action.PHOTO
+            FlightAction.RECORD_START -> Dji4Action.RECORD_START
+            FlightAction.RECORD_STOP -> Dji4Action.RECORD_STOP
+            FlightAction.PHOTO_MODE -> Dji4Action.PHOTO_MODE
+            FlightAction.VIDEO_MODE -> Dji4Action.VIDEO_MODE
+            FlightAction.GIMBAL_DOWN -> Dji4Action.GIMBAL_DOWN
+            FlightAction.GIMBAL_LEVEL -> Dji4Action.GIMBAL_LEVEL
+            FlightAction.STREAM_START, FlightAction.STREAM_STOP -> error("not a flight action")
         },
         onResult,
     )
@@ -72,13 +98,31 @@ object Dji4Source : AircraftSource {
             gimbalPitchDeg = d.gimbalPitchDeg,
             flightTimeS = d.flightTimeS,
             video = connected,
+            cameraMode = when (d.cameraMode) {
+                Dji4CameraMode.PHOTO -> CameraMode.PHOTO
+                Dji4CameraMode.VIDEO -> CameraMode.VIDEO
+                null -> null
+            },
+            recording = d.recording,
+            recordingTimeS = d.recordingTimeS,
+            linkPercent = d.linkPercent,
+            streaming = d.streaming,
             // UAS-FLT-002: an action is offered only while the aircraft reports a state that allows it.
             actions = buildSet {
                 if (d.flying == false) add(FlightAction.TAKEOFF)
                 if (d.flying == true) add(FlightAction.LAND)
                 if (d.flying == true && !d.goingHome && d.homeDistanceM != null) add(FlightAction.RTH)
                 if (d.goingHome) add(FlightAction.STOP_RTH)
-                if (connected && d.hasCamera) add(FlightAction.PHOTO)
+                // Camera actions follow the reported mode; while it is unknown none is offered.
+                if (connected && d.hasCamera && d.recording == false) when (d.cameraMode) {
+                    Dji4CameraMode.PHOTO -> { add(FlightAction.PHOTO); add(FlightAction.VIDEO_MODE) }
+                    Dji4CameraMode.VIDEO -> { add(FlightAction.RECORD_START); add(FlightAction.PHOTO_MODE) }
+                    null -> {}
+                }
+                if (connected && d.recording == true) add(FlightAction.RECORD_STOP)
+                if (connected && !d.streaming && streamUrl() != null) add(FlightAction.STREAM_START)
+                if (d.streaming) add(FlightAction.STREAM_STOP)
+                if (connected && d.hasGimbal && d.gimbalPitchDeg != null) { add(FlightAction.GIMBAL_DOWN); add(FlightAction.GIMBAL_LEVEL) }
             },
         )
     }

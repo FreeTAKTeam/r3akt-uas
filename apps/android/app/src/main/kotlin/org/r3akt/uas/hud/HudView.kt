@@ -83,13 +83,14 @@ class HudView(context: Context) : ViewGroup(context) {
     private val flight = button(Hud.aircraft, "FLIGHT")
     private val takeoffLand = button(Hud.takeoff, "TAKEOFF")
     private val rth = button(Hud.home, "RTH")
-    private val cameraMode = button(Hud.photo).apply { contentDescription = "Camera mode, not built yet"; isEnabled = false }
+    private val cameraMode = button(Hud.photo)
     private val shutterButton = button(null, shutter = true).apply { contentDescription = "Take photo" }
     private val menu = button(Hud.menu, "MENU")
     private val map = button(Hud.map, "MAP").apply { contentDescription = "Map" }
     private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations" }
     private val radar = button(null, "RADAR").apply { contentDescription = "Radar" }
     private val setup = button(null, "SETUP").apply { contentDescription = "Connection and setup" }
+    private val stream = button(null, "STREAM")
     private val sessions = button(null, "HIST").apply { contentDescription = "Sessions and recordings" }
     // Invisible: the small radar is drawn below; this only takes the tap.
     private val radarTap = View(context).apply { contentDescription = "Open the radar"; isFocusable = true }
@@ -98,6 +99,8 @@ class HudView(context: Context) : ViewGroup(context) {
     private val cancel = button(null, "CANCEL")
     private val dismiss = button(Hud.close, bare = true).apply { contentDescription = "Dismiss error" }
     // Invisible: the reticle is drawn below; this only takes the tap.
+    // Invisible: the gimbal scale is drawn below; a tap points the camera down or back to level.
+    private val gimbalTap = View(context).apply { isFocusable = true }
     private val aim = View(context).apply { contentDescription = "Place a marker at the aim cross"; isFocusable = true }
 
     init {
@@ -110,6 +113,7 @@ class HudView(context: Context) : ViewGroup(context) {
         add(flight, 12f, 132f, 60f, 60f, Anchor.LEFT)
         add(takeoffLand, 12f, 200f, 60f, 60f, Anchor.LEFT)
         add(rth, 12f, 266f, 60f, 60f, Anchor.LEFT)
+        add(gimbalTap, 812f, 150f, 60f, 240f, Anchor.RIGHT)
         add(cameraMode, 880f, 180f, 68f, 48f, Anchor.RIGHT)
         add(shutterButton, 880f, 238f, 68f, 68f, Anchor.RIGHT)
         add(menu, 888f, 476f, 60f, 52f, Anchor.RIGHT)
@@ -119,6 +123,7 @@ class HudView(context: Context) : ViewGroup(context) {
         add(radar, 692f, 416f, 60f, 52f, Anchor.RIGHT)
         add(setup, 756f, 416f, 60f, 52f, Anchor.RIGHT)
         add(sessions, 820f, 416f, 60f, 52f, Anchor.RIGHT)
+        add(stream, 888f, 416f, 60f, 52f, Anchor.RIGHT)
         add(slider, 308f, 266f, 344f, 52f, Anchor.CENTER)
         add(cancel, 562f, 330f, 90f, 44f, Anchor.CENTER)
         add(dismiss, 642f, 408f, 44f, 44f, Anchor.CENTER)
@@ -134,7 +139,10 @@ class HudView(context: Context) : ViewGroup(context) {
         sessions.setOnClickListener { onScreen(Screen.SESSIONS) }
         takeoffLand.setOnClickListener { pending = if (state.airborne == true) FlightAction.LAND else FlightAction.TAKEOFF; applyState() }
         rth.setOnClickListener { if (state.rthActive) onAction(FlightAction.STOP_RTH) else { pending = FlightAction.RTH; applyState() } }
-        shutterButton.setOnClickListener { onAction(FlightAction.PHOTO) }
+        shutterButton.setOnClickListener { shutterAction()?.let(onAction) }
+        cameraMode.setOnClickListener { onAction(if (state.cameraMode == CameraMode.VIDEO) FlightAction.PHOTO_MODE else FlightAction.VIDEO_MODE) }
+        gimbalTap.setOnClickListener { onAction(gimbalAction()) }
+        stream.setOnClickListener { onAction(if (state.streaming) FlightAction.STREAM_STOP else FlightAction.STREAM_START) }
         slider.onConfirm = { pending?.let { pending = null; applyState(); onAction(it) } }
         cancel.setOnClickListener { pending = null; applyState() }
         dismiss.setOnClickListener { alert = null }
@@ -157,7 +165,27 @@ class HudView(context: Context) : ViewGroup(context) {
         rth.tone = if (st.rthActive) HudButton.Tone.CAUTION else HudButton.Tone.NORMAL
         rth.label = if (st.rthActive) "STOP RTH" else "RTH"
         rth.contentDescription = (if (st.rthActive) "Stop return to home" else "Return to home") + if (rth.isEnabled) "" else ", unavailable"
-        shutterButton.isEnabled = FlightAction.PHOTO in st.actions
+        shutterButton.isEnabled = shutterAction() in st.actions
+        shutterButton.video = st.cameraMode == CameraMode.VIDEO
+        shutterButton.recording = st.recording == true
+        shutterButton.contentDescription = when (shutterAction()) {
+            FlightAction.RECORD_STOP -> "Stop recording"
+            FlightAction.RECORD_START -> "Start recording"
+            else -> "Take photo"
+        } + if (shutterButton.isEnabled) "" else ", unavailable"
+        val toVideo = st.cameraMode != CameraMode.VIDEO
+        cameraMode.icon = if (toVideo) Hud.photo else Hud.video
+        cameraMode.isEnabled = (if (toVideo) FlightAction.VIDEO_MODE else FlightAction.PHOTO_MODE) in st.actions
+        cameraMode.contentDescription = (if (toVideo) "Photo mode; switch to video" else "Video mode; switch to photo") +
+            if (cameraMode.isEnabled) "" else ", unavailable"
+        stream.label = if (st.streaming) "STOP" else "STREAM"
+        stream.tone = if (st.streaming) HudButton.Tone.CAUTION else HudButton.Tone.NORMAL
+        stream.isEnabled = (if (st.streaming) FlightAction.STREAM_STOP else FlightAction.STREAM_START) in st.actions
+        stream.contentDescription = (if (st.streaming) "Stop the video stream" else "Stream video to the video server") +
+            if (stream.isEnabled) "" else ", unavailable"
+        gimbalTap.isEnabled = gimbalAction() in st.actions
+        gimbalTap.contentDescription = (if (gimbalAction() == FlightAction.GIMBAL_DOWN) "Point the gimbal down" else "Level the gimbal") +
+            if (gimbalTap.isEnabled) "" else ", unavailable"
 
         // UAS-FLT-004: a confirm never outlives its action, so nothing fires after a disconnect.
         if (pending !in st.actions) pending = null
@@ -177,9 +205,19 @@ class HudView(context: Context) : ViewGroup(context) {
 
         menu.icon = if (menuOpen) Hud.close else Hud.menu
         menu.contentDescription = if (menuOpen) "Close menu" else "Menu"
-        for (v in listOf(map, observations, log, radar, setup, sessions)) v.visibility = if (menuOpen) VISIBLE else GONE
+        for (v in listOf(map, observations, log, radar, setup, sessions, stream)) v.visibility = if (menuOpen) VISIBLE else GONE
         invalidate()
     }
+
+    /** The shutter records in video mode and shoots a photo otherwise. */
+    private fun shutterAction() = when {
+        state.recording == true -> FlightAction.RECORD_STOP
+        state.cameraMode == CameraMode.VIDEO -> FlightAction.RECORD_START
+        else -> FlightAction.PHOTO
+    }
+
+    private fun gimbalAction() =
+        if ((state.gimbalPitchDeg ?: 0.0) > -45.0) FlightAction.GIMBAL_DOWN else FlightAction.GIMBAL_LEVEL
 
     private fun confirmText(action: FlightAction) = when (action) {
         FlightAction.LAND -> Triple("CONFIRM LANDING",
@@ -297,6 +335,10 @@ class HudView(context: Context) : ViewGroup(context) {
         drawSpeed(canvas, st)
         drawAltitude(canvas, st)
         drawGimbal(canvas, st.gimbalPitchDeg)
+        if (st.recording == true) {
+            val t = st.recordingTimeS?.let { "%d:%02d".format(it / 60, it % 60) } ?: "—"
+            write(canvas, "REC $t", x(914f, Anchor.RIGHT), y(326f), 12f, Hud.RED, monospace = true, align = Paint.Align.CENTER)
+        }
         val confirm = pending
         if (confirm == null) drawReticle(canvas) else drawConfirm(canvas, st, confirm)
         drawRadar(canvas, st.headingDeg)
@@ -383,8 +425,13 @@ class HudView(context: Context) : ViewGroup(context) {
         }
         val battery = st.batteryPercent
         cell("BAT", battery?.let { "$it%" } ?: "—", if (battery != null && battery <= 30) Hud.AMBER else Hud.WHITE)
-        cell("STRM", "OFF", Hud.DIM)
-        cell("MESH", "OFF", Hud.DIM)
+        cell("LINK", st.linkPercent?.let { "$it%" } ?: "—", if (st.linkPercent != null && st.linkPercent <= 30) Hud.AMBER else Hud.WHITE)
+        if (st.streaming) cell("STRM", "LIVE", Hud.GREEN) else cell("STRM", "OFF", Hud.DIM)
+        when (st.mesh) {
+            true -> cell("MESH", "ON", Hud.GREEN)
+            false -> cell("MESH", "DOWN", Hud.AMBER)
+            null -> cell("MESH", "OFF", Hud.DIM)
+        }
         cell("GPS", st.gpsSatellites?.toString() ?: "—")
 
         // Battery bar under the top bar.

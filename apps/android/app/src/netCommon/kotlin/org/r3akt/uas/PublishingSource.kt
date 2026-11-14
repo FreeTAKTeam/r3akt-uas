@@ -136,7 +136,8 @@ class PublishingSource(
         // The store is read on the worker, like every other marker call.
         worker.execute { markerCache = runCatching { markerList() }.getOrDefault(markerCache) }
         val status = publishStatus()
-        return state.copy(status = "${state.status} · ${status.state.name} ${status.fixesSent}")
+        // MESH is on while the Reticulum interface to the hub reports its stream connected.
+        return state.copy(status = "${state.status} · ${status.state.name} ${status.fixesSent}", mesh = status.hubConnected)
     }
 
     override fun describe(): String = inner.describe() + "\n" + publicationReport()
