@@ -43,6 +43,9 @@ interface AircraftSource {
     /** A long-press on an empty radar spot at (range m, true bearing) from the aircraft (D-10 (b)); null when markers are not offered. */
     fun radarPick(): ((android.app.Activity, Double, Double) -> Unit)? = null
 
+    /** Media on the aircraft's card, or null when this source has none. */
+    fun media(): AircraftMedia? = null
+
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null
 

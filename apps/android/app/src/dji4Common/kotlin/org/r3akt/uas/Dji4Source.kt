@@ -35,6 +35,15 @@ object Dji4Source : AircraftSource {
 
     override fun describe() = Dji4Sdk.describe()
 
+    override fun media() = object : AircraftMedia {
+        override fun list(onResult: (List<MediaItem>?, String?) -> Unit) = Dji4Sdk.listMedia { files, error ->
+            onResult(files?.map { MediaItem(it.name, it.sizeBytes, it.created, it.durationS, it.video) }, error)
+        }
+        override fun download(name: String, dir: java.io.File, onProgress: (Long, Long) -> Unit, onDone: (java.io.File?, String?) -> Unit) =
+            Dji4Sdk.downloadMedia(name, dir, onProgress, onDone)
+        override fun close() = Dji4Sdk.closeMedia()
+    }
+
     override fun videoView(context: Context): View = Dji4VideoView(context)
 
     override fun perform(action: FlightAction, onResult: (String?) -> Unit) = when (action) {

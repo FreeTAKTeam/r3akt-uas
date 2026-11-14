@@ -3,12 +3,15 @@ package org.r3akt.uas.screens
 import android.app.Activity
 import android.app.AlertDialog
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import org.r3akt.uas.MediaItem
 import org.r3akt.uas.SessionLog
 import org.r3akt.uas.SessionRecord
+import org.r3akt.uas.Variant
 import org.r3akt.uas.hud.Hud
 import java.io.File
 import java.text.SimpleDateFormat
@@ -17,8 +20,8 @@ import java.util.Locale
 
 /**
  * Past cockpit sessions from the local session record (UAS-VID-008), newest first; a tap opens
- * one session's events. Video is recorded on the aircraft's own card; media download is not
- * built, and this page says so instead of listing anything.
+ * one session's events. RECORDINGS lists the aircraft's card on request and copies chosen files
+ * to the phone; closing the page gives the camera back to shooting.
  */
 class SessionsScreen(private val activity: Activity, close: () -> Unit) : ScreenPage {
     private val frame = PageFrame(activity, Screen.SESSIONS.title, close)
@@ -30,7 +33,13 @@ class SessionsScreen(private val activity: Activity, close: () -> Unit) : Screen
     private val scroll = ScrollView(activity).apply { addView(content) }
     override val view = frame.root.also { frame.body.addView(scroll) }
 
+    private val media = Variant.source.media()
+    /** Where downloads go: app-specific external storage, readable over USB, removed with the app. */
+    private val mediaDir = File(activity.getExternalFilesDir(null) ?: activity.filesDir, "aircraft-media")
+
     init { showList() }
+
+    override fun close() { media?.close() }
 
     private fun showList() {
         content.removeAllViews()
@@ -62,10 +71,64 @@ class SessionsScreen(private val activity: Activity, close: () -> Unit) : Screen
             })
         }
         content.addView(title("RECORDINGS"))
-        // UAS-VID-008, recordings part: nothing is listed until it exists.
-        content.addView(text("Video records on the aircraft's own card (shutter in video mode); start and stop " +
-            "appear in the session events. Not built yet: listing or downloading media from the aircraft. " +
-            "No recordings are kept by this app.", Hud.AMBER))
+        if (media == null) {
+            content.addView(text("This build has no aircraft media. No recordings are kept by this app.", Hud.AMBER))
+            return
+        }
+        content.addView(text("Photos and video stay on the aircraft's card until you download them here, " +
+            "on the ground with nothing recording or streaming. Saved to $mediaDir", Hud.DIM))
+        val box = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        content.addView(Button(activity).apply {
+            text = "LIST AIRCRAFT MEDIA"
+            setOnClickListener { listMedia(box) }
+        })
+        content.addView(box)
+    }
+
+    private fun listMedia(box: LinearLayout) {
+        box.removeAllViews()
+        box.addView(text("Reading the aircraft's card…", Hud.DIM))
+        media?.list { files, error -> activity.runOnUiThread {
+            box.removeAllViews()
+            when {
+                files == null -> box.addView(text("Not listed: ${error ?: "no reason reported"}", Hud.AMBER))
+                files.isEmpty() -> box.addView(text("The card holds no files.", Hud.WHITE))
+                else -> files.forEach { box.addView(mediaRow(it)) }
+            }
+        } }
+    }
+
+    private fun mediaRow(m: MediaItem): View {
+        val kept = File(mediaDir, m.name)
+        val label = text(mediaSummary(m) + if (kept.isFile) "\non this phone" else "", Hud.WHITE)
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, PageFrame.dp(activity, 4), 0, PageFrame.dp(activity, 4))
+            addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(Button(activity).apply {
+                text = "DOWNLOAD"
+                setOnClickListener { button ->
+                    button.isEnabled = false
+                    media?.download(m.name, mediaDir,
+                        onProgress = { done, total -> activity.runOnUiThread {
+                            label.text = mediaSummary(m) + "\ndownloading " + if (total > 0) "${done * 100 / total}%" else "${done / 1024} KiB"
+                        } },
+                        onDone = { file, error -> activity.runOnUiThread {
+                            button.isEnabled = true
+                            label.text = mediaSummary(m) + "\n" + (file?.let { "saved: ${it.path}" } ?: "not downloaded: ${error ?: "no reason reported"}")
+                            label.setTextColor(if (file != null) Hud.WHITE else Hud.AMBER)
+                        } })
+                }
+            })
+        }
+    }
+
+    private fun mediaSummary(m: MediaItem): String {
+        val kind = when (m.video) { true -> "video"; false -> "photo"; null -> "type unknown" }
+        val size = m.sizeBytes?.let { "%.1f MB".format(it / 1_000_000.0) } ?: "size unknown"
+        val length = m.durationS?.let { " · ${duration((it * 1000).toLong())}" }.orEmpty()
+        return "${m.name} · $kind · $size$length\n${m.created ?: "date not reported"}"
     }
 
     private fun summary(r: SessionRecord, current: Boolean): String {
