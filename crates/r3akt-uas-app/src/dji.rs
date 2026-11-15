@@ -2,6 +2,7 @@
 //! as the SDK reports them in, SI cockpit values out. What DJI does not know
 //! stays unknown; nothing is replaced by zero.
 
+use crate::camera::CameraPose;
 use crate::telemetry::{AltitudeReference, TelemetrySample};
 
 /// Below this ground speed the aircraft counts as stationary: no course over ground,
@@ -112,6 +113,50 @@ pub fn dji_sample(
     })
 }
 
+// Aim-point bounds for DJI SDK 4 (owner ruling D-15 (b), 15 November 2026), which reports none.
+// shortcut: Mavic Air 2 figures used for every DJI aircraft; add a per-model table when a second model flies.
+/// DJI Mavic Air 2 specification, hovering accuracy with GPS: horizontal ±1.5 m.
+pub const DJI_HORIZONTAL_ERROR_M: f64 = 1.5;
+/// DJI Mavic Air 2 specification, hovering accuracy with GPS: vertical ±0.5 m.
+pub const DJI_ALTITUDE_ERROR_M: f64 = 0.5;
+/// Our estimate: DJI publishes no compass or gimbal yaw accuracy.
+pub const DJI_AZIMUTH_ERROR_DEG: f64 = 5.0;
+/// Our estimate: DJI publishes no gimbal pitch accuracy.
+pub const DJI_ELEVATION_ERROR_DEG: f64 = 1.0;
+/// Our estimate: how far the ground at the target may lie above or below the take-off point.
+pub const DJI_GROUND_ERROR_M: f64 = 5.0;
+
+/// Where a DJI camera points for the fix `fix`, or `None` when DJI does not report the
+/// aircraft heading or the gimbal angles. The azimuth is the aircraft heading plus the gimbal
+/// yaw relative to it, the elevation the gimbal pitch, and the ground the take-off point's
+/// level (no terrain data), all with the bounds above.
+#[uniffi::export]
+#[must_use]
+pub fn dji_camera_pose(
+    fix: &TelemetrySample,
+    heading_deg: Option<f64>,
+    gimbal_yaw_relative_deg: Option<f64>,
+    gimbal_pitch_deg: Option<f64>,
+) -> Option<CameraPose> {
+    let azimuth = (heading_deg? + gimbal_yaw_relative_deg?).rem_euclid(360.0);
+    let elevation = gimbal_pitch_deg?;
+    if !azimuth.is_finite() || !elevation.is_finite() {
+        return None;
+    }
+    Some(CameraPose {
+        sample_time_ms: fix.fix_time_s.saturating_mul(1000),
+        azimuth_deg: azimuth,
+        elevation_deg: elevation,
+        ground_height_m: Some(0.0),
+        ground_height_error_m: DJI_GROUND_ERROR_M,
+        altitude_error_m: DJI_ALTITUDE_ERROR_M,
+        azimuth_error_deg: DJI_AZIMUTH_ERROR_DEG,
+        elevation_error_deg: DJI_ELEVATION_ERROR_DEG,
+        max_speed_mps: fix.ground_speed_mps,
+        horizontal_error_m: Some(DJI_HORIZONTAL_ERROR_M),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +240,34 @@ mod tests {
             ..raw()
         });
         assert!(dji_sample(&no_fix, Some(5), None, 1_000, 1_000).is_none());
+    }
+
+    #[test]
+    fn dji_aim_point_follows_heading_plus_gimbal_yaw_at_take_off_level() {
+        let fix = TelemetrySample {
+            altitude_m: 30.0,
+            ground_speed_mps: 0.0,
+            ..dji_sample(&normalize_dji(&raw()), Some(4), None, 1_000_000, 1_000_000).unwrap()
+        };
+        // Heading 270 plus gimbal yaw +90 looks north; 45° down from 30 m is 30 m away.
+        let pose = dji_camera_pose(&fix, Some(270.0), Some(90.0), Some(-45.0)).unwrap();
+        assert!(pose.azimuth_deg.abs() < 1e-9);
+        let point = crate::camera::camera_point(&fix, &pose, 1_000_000).unwrap();
+        assert!(
+            (point.ground_range_m - 30.0).abs() < 0.5,
+            "{}",
+            point.ground_range_m
+        );
+        assert!(point.position.lat() > fix.latitude_deg);
+        assert!((point.position.lon() - fix.longitude_deg).abs() < 1e-6);
+        assert!(point.uncertainty_radius_m > DJI_HORIZONTAL_ERROR_M);
+        // The published fix still carries no accuracy: the bound is only the aim point's.
+        assert_eq!(fix.horizontal_accuracy_m, None);
+        // No heading or no gimbal angle: no pose.
+        assert!(dji_camera_pose(&fix, None, Some(0.0), Some(-45.0)).is_none());
+        assert!(dji_camera_pose(&fix, Some(0.0), Some(0.0), None).is_none());
+        // Level camera: refused by the shared geometry, never a horizon guess.
+        let level = dji_camera_pose(&fix, Some(0.0), Some(0.0), Some(0.0)).unwrap();
+        assert!(crate::camera::camera_point(&fix, &level, 1_000_000).is_err());
     }
 }

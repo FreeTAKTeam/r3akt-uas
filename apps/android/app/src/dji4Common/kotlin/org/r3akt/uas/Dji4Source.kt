@@ -5,6 +5,8 @@ import android.content.Context
 import android.view.View
 import org.r3akt.uas.bridge.AltitudeReference
 import org.r3akt.uas.bridge.TelemetrySample
+import org.r3akt.uas.bridge.CameraPose
+import org.r3akt.uas.bridge.djiCameraPose
 import org.r3akt.uas.bridge.djiSample
 import org.r3akt.uas.dji4.Dji4Action
 import org.r3akt.uas.dji4.Dji4CameraMode
@@ -193,5 +195,11 @@ object Dji4Source : AircraftSource {
             at.toULong(),
             System.currentTimeMillis().toULong(),
         )
+    }
+
+    /** Where the camera aims for [fix], or `null` without heading or gimbal angles: the rules are Rust's `dji_camera_pose`. */
+    fun cameraPose(fix: TelemetrySample): CameraPose? {
+        val d = Dji4Sdk.state()
+        return djiCameraPose(fix, d.pose?.headingDeg, d.gimbalYawRelativeDeg, d.gimbalPitchDeg)
     }
 }

@@ -152,7 +152,7 @@ class AimMarkerPanel(
                 val pose = cameraPose
                 if (offset != null) markerCreateAtOffset(name, affiliation, offset.second, offset.first).name
                 else if (pose == null) markerCreate(name, affiliation).name
-                else markerCreateAtCamera(name, affiliation, pose() ?: error("aircraft position unknown")).name
+                else markerCreateAtCamera(name, affiliation, pose() ?: error("no aircraft position, heading or gimbal angle")).name
             }
             activity.runOnUiThread {
                 place.isEnabled = true

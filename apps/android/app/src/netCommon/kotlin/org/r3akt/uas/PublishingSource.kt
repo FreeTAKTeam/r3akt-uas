@@ -36,7 +36,7 @@ class PublishingSource(
     private val inner: AircraftSource,
     private val storeName: String,
     private val fix: (seq: UInt) -> TelemetrySample?,
-    private val cameraPose: ((seq: UInt, fix: TelemetrySample) -> CameraPose)?,
+    private val cameraPose: ((seq: UInt, fix: TelemetrySample) -> CameraPose?)?,
 ) : AircraftSource by inner {
     override val name = "${inner.name}, RCH publish test build"
 
@@ -104,7 +104,7 @@ class PublishingSource(
     }
 
     // The pose that belongs to the last offered fix, stamped with that fix's time.
-    private fun pose(provider: (UInt, TelemetrySample) -> CameraPose): CameraPose? =
+    private fun pose(provider: (UInt, TelemetrySample) -> CameraPose?): CameraPose? =
         lastFix?.let { provider(lastSeq, it) }
 
     private fun startPublishing() {
