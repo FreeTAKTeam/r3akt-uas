@@ -15,6 +15,7 @@ import org.r3akt.uas.bridge.publishOfferFix
 import org.r3akt.uas.bridge.publishStart
 import org.r3akt.uas.bridge.publishStatus
 import org.r3akt.uas.bridge.publishStop
+import org.r3akt.uas.bridge.receivedMarkers
 import org.r3akt.uas.hud.HudState
 import org.r3akt.uas.hud.HudView
 import java.io.File
@@ -92,15 +93,28 @@ class PublishingSource(
     private fun hudIn(v: View): HudView? = v as? HudView
         ?: (v as? ViewGroup)?.let { g -> (0 until g.childCount).firstNotNullOfOrNull { hudIn(g.getChildAt(it)) } }
 
-    // Inner contacts (simulated ones in simNet) plus this app's markers. A marker placed from a
-    // simulated aircraft carries the "SIMULATED · " note prefix (markers.rs), so it counts as simulated.
-    override fun contacts(): List<Contact> = inner.contacts() + markerCache.map { m ->
-        Contact(
-            id = m.objectId, name = m.name, symbol = m.symbol, lat = m.lat, lon = m.lon,
-            source = "this app",
-            simulated = m.notes?.startsWith("SIMULATED") == true,
-            positionTimeMs = m.updatedMs, contactTimeMs = m.updatedMs, receivedTimeMs = null,
-        )
+    // Inner contacts (simulated ones in simNet), this app's markers and the team markers received
+    // from the hub (UAS-PRD-013). A marker placed from a simulated aircraft carries the
+    // "SIMULATED · " note prefix (markers.rs), so it counts as simulated.
+    override fun contacts(): List<Contact> {
+        val own = markerCache
+        val received = receivedMarkers().filter { r -> own.none { it.objectId == r.marker.objectId } }
+        return inner.contacts() + own.map { m ->
+            Contact(
+                id = m.objectId, name = m.name, symbol = m.symbol, lat = m.lat, lon = m.lon,
+                source = "this app",
+                simulated = m.notes?.startsWith("SIMULATED") == true,
+                positionTimeMs = m.updatedMs, contactTimeMs = m.updatedMs, receivedTimeMs = null,
+            )
+        } + received.map { r ->
+            val m = r.marker
+            Contact(
+                id = m.objectId, name = m.name, symbol = m.symbol, lat = m.lat, lon = m.lon,
+                source = r.source,
+                simulated = m.notes?.startsWith("SIMULATED") == true,
+                positionTimeMs = m.updatedMs, contactTimeMs = m.updatedMs, receivedTimeMs = r.receivedMs,
+            )
+        }
     }
 
     // The pose that belongs to the last offered fix, stamped with that fix's time.

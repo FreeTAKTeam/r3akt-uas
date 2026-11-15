@@ -20,6 +20,7 @@ Source: [PLAN.md](../goals/bootstrap/PLAN.md), section 1, decisions of 4 Novembe
 | **UAS-PRD-010** | The application works offline and synchronizes selectively when connectivity returns. |
 | **UAS-PRD-011** | Releases are signed APKs. Original code is EPL-2.0; upstream notices are kept in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md). |
 | **UAS-PRD-012** | Flight commands belong only to the local DJI interface. RCH carries telemetry and mission information and never commands the aircraft. |
+| **UAS-PRD-013** | The application receives the messages addressed to its identity, as REM does, and displays selected content: team markers on the radar and the map. Everything else it receives is ignored, and nothing received reaches the DJI interface (UAS-PRD-012). |
 
 ## Out of scope for the first release
 

@@ -44,7 +44,8 @@ Evidence is captured from both the operator side and the receiving client (RCH m
 | UAS-PRD-009 | 5 | MediaMTX playback evidence | specified |
 | UAS-PRD-010 | 3, 5 | Offline/mesh evidence (operator markers through the LXMF-rs custody outbox in milestone 3; constrained mesh in 5) | proven in scope for milestone 3 (a create and a move made on the Pixel 7 with the hub down were delivered once each to RCH and REM after it came back, [evidence](../evidence/m3-task5-markers-rem-proof.md); a delete during an outage is host-proven only, [outbox spike](../evidence/m3-task1-outbox-spike.md)); constrained mesh: specified |
 | UAS-PRD-011 | 1, 6 | EPL-2.0 `LICENSE`, `THIRD_PARTY_NOTICES.md` (1); signed APK (6) | scaffold-proven (licensing); signing specified |
-| UAS-PRD-012 | 2, 4 | No flight command path in RCH integration; review + tests | proven in scope (step 2a: the publisher has no receive path, G-17; POST review) |
+| UAS-PRD-012 | 2, 4 | No flight command path in RCH integration; review + tests | proven in scope (step 2a, POST review); since UAS-PRD-013 the app receives, and received data only feeds the radar and map |
+| UAS-PRD-013 | 3, 4 | A marker created in REM appears on the app's radar and map, through the hub; other received messages change nothing | implemented but unproven (15 November 2026): received through the transport's data and resource events as REM does, decoded with `lxmf-core` and the shared RCH and map rules, newest update wins, deletes remove, at most 500 kept in memory; host-tested with a signed LXMF message; not yet shown on the phone |
 | UAS-ARC-001 | 1–5 | Architecture review at each milestone gate | specified |
 | UAS-ARC-003 | 1–5 | Architecture review at each milestone gate | specified |
 | UAS-ARC-004 | 1–5 | Architecture review at each milestone gate | specified |

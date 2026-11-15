@@ -363,7 +363,7 @@ type Net = (
 
 /// REM's announce capabilities (owner ruling D-19): RCH lists a peer as a REM client, which an
 /// operator can add to a team, only with `r3akt` and `emergencymessages`. The app handles no
-/// Emergency Action Messages and reads nothing the hub sends it (G-17).
+/// Emergency Action Messages; of what it receives it keeps only team markers (UAS-PRD-013).
 const ANNOUNCE_CAPABILITIES: [&str; 3] = ["r3akt", "emergencymessages", "telemetry"];
 
 /// The LXMF delivery announce app data RCH lists the app by: a display name and
@@ -400,6 +400,7 @@ fn connect(
         let destination = transport
             .add_destination(private.clone(), DestinationName::new("lxmf", "delivery"))
             .await;
+        crate::received::spawn(&transport, destination.lock().await.desc.address_hash);
         transport
             .set_destination_announce_app_data(&destination, app_data)
             .await;
@@ -606,7 +607,7 @@ fn deposit_marker(
 }
 
 /// Recovers the oldest undelivered change, as a Resource so its completion records delivery
-/// (the app has no receive path for recipient proofs, G-17).
+/// (recipient proofs are not read).
 fn recover_oldest_marker(
     runtime: &tokio::runtime::Runtime,
     outbox: &LocalPropagation,
