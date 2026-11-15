@@ -150,7 +150,7 @@ class PublishingSource(
 
     override fun perform(action: FlightAction, onResult: (String?) -> Unit) =
         if (action != FlightAction.ANNOUNCE) inner.perform(action, onResult)
-        else if (!publishing) onResult("Start publishing first: LOG → START PUBLISH")
+        else if (!publishing) onResult("Start publishing first: MESH → START PUBLISH")
         else { publishAnnounce(); onResult(null) }
 
     override fun cockpit(seq: UInt): HudState {
@@ -221,8 +221,8 @@ class PublishingSource(
                 when {
                     publishing -> "${s.state.name}, hub connected ${s.hubConnected}, fixes sent ${s.fixesSent}" +
                         if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""
-                    stoppedByPause -> "Stopped when the cockpit paused; LOG → START PUBLISH"
-                    else -> "Off; LOG → START PUBLISH"
+                    stoppedByPause -> "Stopped when the cockpit paused; MESH → START PUBLISH"
+                    else -> "Off; MESH → START PUBLISH"
                 } + (error?.let { "\nError: $it" } ?: ""),
             ),
         )

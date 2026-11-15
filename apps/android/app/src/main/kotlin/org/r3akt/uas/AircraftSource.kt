@@ -19,7 +19,7 @@ interface AircraftSource {
     /** Called once from the cockpit activity; a source that connects to hardware starts here. */
     fun start(context: Context) {}
 
-    /** A human-readable status report, shown from the cockpit's LOG button. */
+    /** A human-readable status report, shown from the cockpit's MESH button. */
     fun describe(): String
 
     /** Cockpit state for update `seq` (polled every [periodMs]). Unknown values stay null. */

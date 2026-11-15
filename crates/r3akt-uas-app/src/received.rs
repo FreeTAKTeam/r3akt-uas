@@ -35,7 +35,7 @@ pub struct ReceivedMarker {
 // shortcut: kept in memory only, so a restart shows nothing until the hub sends again; persist when REM-style replay is needed.
 static MARKERS: Mutex<BTreeMap<String, ReceivedMarker>> = Mutex::new(BTreeMap::new());
 
-// What reached the receiver, for the LOG report: packets to any destination, packets and
+// What reached the receiver, for the MESH report: packets to any destination, packets and
 // resources for the app, LXMF messages decoded, messages with RCH events, marker events applied.
 static COUNTS: [AtomicU64; 6] = [const { AtomicU64::new(0) }; 6];
 const ANY: usize = 0;
@@ -49,7 +49,7 @@ fn count(which: usize) {
     COUNTS[which].fetch_add(1, Ordering::Relaxed);
 }
 
-/// One line for the LOG report: how far received data got.
+/// One line for the MESH report: how far received data got.
 #[uniffi::export]
 #[must_use]
 pub fn received_report() -> String {

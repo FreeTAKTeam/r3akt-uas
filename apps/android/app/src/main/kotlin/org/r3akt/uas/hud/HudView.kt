@@ -95,7 +95,7 @@ class HudView(context: Context) : ViewGroup(context) {
     private val sessions = button(Hud.history, "HIST").apply { contentDescription = "Sessions and recordings" }
     // Invisible: the small radar is drawn below; this only takes the tap.
     private val radarTap = View(context).apply { contentDescription = "Open the radar"; isFocusable = true }
-    private val log = button(Hud.log, "LOG").apply { contentDescription = "Session log" }
+    private val log = button(Hud.mesh, "MESH").apply { contentDescription = "Mesh: hub publishing, markers and status" }
     private val slider = HudSlider(context, { s }, label)
     private val cancel = button(null, "CANCEL")
     private val dismiss = button(Hud.close, bare = true).apply { contentDescription = "Dismiss error" }

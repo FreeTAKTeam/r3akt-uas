@@ -83,7 +83,7 @@ class Dji4VideoView(context: Context) : TextureView(context), TextureView.Surfac
             }
         }
 
-        /** Video feed and decoder state since the previous report, for the LOG dialog. */
+        /** Video feed and decoder state since the previous report, for the MESH dialog. */
         @Synchronized
         fun report(): String {
             val now = SystemClock.elapsedRealtime()

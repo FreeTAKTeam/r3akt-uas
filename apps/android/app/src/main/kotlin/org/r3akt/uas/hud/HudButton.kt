@@ -309,5 +309,9 @@ object Hud {
         addCircle(12f, 9f, 1.5f, Path.Direction.CW)
         addArc(7f, 4f, 17f, 14f, 200f, 140f); addArc(3f, 0f, 21f, 18f, 205f, 130f)
     }
-    val log: Icon = { for (y in listOf(6f, 12f, 18f)) { moveTo(9f, y); lineTo(21f, y); moveTo(4f, y); lineTo(5f, y) } }
+    val mesh: Icon = {
+        for ((x, y) in listOf(12f to 4f, 4f to 19f, 20f to 19f)) { moveTo(12f, 13f); lineTo(x, y) }
+        moveTo(12f, 4f); lineTo(4f, 19f); lineTo(20f, 19f); close()
+        for ((x, y) in listOf(12f to 4f, 4f to 19f, 20f to 19f, 12f to 13f)) addCircle(x, y, 2.2f, Path.Direction.CW)
+    }
 }
