@@ -8,6 +8,7 @@ import dji.common.error.DJISDKError
 import dji.common.camera.SettingsDefinitions
 import dji.common.camera.SystemState
 import dji.common.flightcontroller.FlightControllerState
+import dji.common.flightcontroller.FlightMode
 import dji.common.gimbal.Rotation
 import dji.common.gimbal.RotationMode
 import dji.common.flightcontroller.GPSSignalLevel
@@ -51,6 +52,8 @@ data class Dji4State(
     val flying: Boolean?,
     val motorsOn: Boolean?,
     val goingHome: Boolean,
+    /** A DJI landing mode, from LAND or the end of a return home. */
+    val landing: Boolean,
     val flightMode: String?,
     val satellites: Int?,
     /** DJI `GPSSignalLevel` 0..5; `null` when DJI reports NONE. */
@@ -192,6 +195,7 @@ object Dji4Sdk {
         val product = aircraft.takeIf { live }
         val fc = flight.takeIf { live }
         val cam = camera.takeIf { live }
+        val landing = fc?.flightMode in LANDING_MODES
         // All DJI value normalization lives in the Rust integration (UAS-ARC-005).
         val pose = fc?.let {
             val at = it.aircraftLocation
@@ -214,7 +218,9 @@ object Dji4Sdk {
             pose = pose,
             flying = fc?.isFlying,
             motorsOn = fc?.areMotorsOn(),
-            goingHome = fc?.isGoingHome == true,
+            // DJI also reports "going home" during a plain LAND (flight log, 15 November 2026).
+            goingHome = fc?.isGoingHome == true && !landing,
+            landing = landing,
             flightMode = fc?.flightModeString,
             satellites = fc?.satelliteCount,
             gpsLevel = fc?.gpsSignalLevel?.takeIf { it != GPSSignalLevel.NONE }?.value(),
@@ -233,6 +239,10 @@ object Dji4Sdk {
             linkPercent = linkQuality.takeIf { live },
             streaming = live && isStreaming(),
         )
+    }
+
+    private val LANDING_MODES by lazy {
+        setOf(FlightMode.AUTO_LANDING, FlightMode.ATTI_LANDING, FlightMode.CONFIRM_LANDING, FlightMode.MOTOR_STOP_LANDING)
     }
 
     private fun cameraMode(st: SystemState): Dji4CameraMode? =

@@ -84,6 +84,7 @@ object Dji4Source : AircraftSource {
                 d.link == Dji4Link.REGISTERING -> "REGISTERING"
                 d.link == Dji4Link.REGISTRATION_FAILED -> "REGISTRATION FAILED"
                 !connected -> "NO AIRCRAFT"
+                d.landing -> "LANDING"
                 d.goingHome -> "RETURNING HOME"
                 d.flying == true -> "IN FLIGHT"
                 d.motorsOn == true -> "MOTORS ON"
