@@ -63,7 +63,7 @@ The app's outbox and marker store hold six markers. Each was delivered to the hu
 | Alpha-2 (hostile) | 13:43:31, in flight | Delivered | no |
 | Bravo-1 (unknown) | 13:48:49, after landing | Delivered | no |
 | Charlie-2 (neutral) | 14:05:40, after the team change | Delivered | **yes** (owner) |
-| Echo-1 (friendly) | 14:10:02, in flight (second flight) | Delivered | not confirmed |
+| Echo-1 (friendly) | 14:10:02, in flight (second flight) | Delivered | **yes** (owner) |
 
 - **Cause: G-24.** The `dji4Net` identity, `84b40d986126dd2c67c3c935d9f55a24` (aircraft object `40cb47fb98e46c8c757ea0f5260196e0`), was not a member of team BLUE. The hub drops a team marker from a non-member without an answer, and the app cannot see the drop (G-17).
 - **Resolution:** the owner added the identity to team BLUE. Charlie-2, placed afterwards, appeared on the hub (owner-reported, no screenshot).
@@ -71,10 +71,9 @@ The app's outbox and marker store hold six markers. Each was delivered to the hu
 
 ## What this shows and what it does not
 
-- **Shown:** take-off, landing and return home from the app on a Mavic Air 2, live flight values and take-off-relative altitude in the session records, DJI accepting the photo/video mode buttons, the LANDING status fix, and a marker from the `dji4Net` build reaching the hub once the identity is a team member.
+- **Shown:** take-off, landing and return home from the app on a Mavic Air 2, live flight values and take-off-relative altitude in the session records, DJI accepting the photo/video mode buttons, the LANDING status fix, and markers from the `dji4Net` build reaching the hub once the identity is a team member, including Echo-1, placed in flight (owner-reported).
 - **Not shown:**
   - the aircraft on RCH or REM during either flight (in the first, its fixes were most likely dropped with the markers; the second is not checked);
-  - Echo-1 on the hub;
   - photo, video recording, gimbal, live stream or media download in flight;
   - hub screenshots or relay traces;
   - controller disconnection or app recreation in flight;
