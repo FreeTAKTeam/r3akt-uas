@@ -5,9 +5,10 @@
 //! module only maps a [`TelemetrySample`] onto the shared `OriginPosition`.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{RecvTimeoutError, TryRecvError};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::camera::origin_position;
 use base64::Engine as _;
@@ -104,6 +105,8 @@ pub struct PublishStatus {
     pub team_uid: Option<String>,
     /// Marker changes held by the custody outbox and not yet delivered to the hub.
     pub markers_pending: u32,
+    /// When the app last announced itself, epoch seconds; peers need it to reach the app.
+    pub last_announce_s: Option<i64>,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq, uniffi::Error)]
@@ -124,6 +127,7 @@ enum Cmd {
         reply: std::sync::mpsc::Sender<Result<(), String>>,
     },
     ResendLast,
+    Announce,
     Stop,
 }
 
@@ -235,6 +239,7 @@ const STATUS_STOPPED: PublishStatus = PublishStatus {
     last_error: None,
     team_uid: None,
     markers_pending: 0,
+    last_announce_s: None,
 };
 
 /// Lower-cases a 32-hex hash; RCH matches hashes and team UIDs in lower case.
@@ -314,6 +319,33 @@ pub(crate) fn submit_marker(change: Change, record: MarkerRecord) -> Result<(), 
     result
         .recv_timeout(MARKER_REPLY_TIMEOUT)
         .map_err(|_| "publisher did not answer".to_owned())?
+}
+
+/// Seconds between announces while connected (owner, 15 November 2026: default 1800).
+pub const DEFAULT_ANNOUNCE_INTERVAL_S: u64 = 1800;
+/// Shortest interval accepted, so announces never flood a constrained link.
+pub const MIN_ANNOUNCE_INTERVAL_S: u64 = 60;
+static ANNOUNCE_INTERVAL_S: AtomicU64 = AtomicU64::new(DEFAULT_ANNOUNCE_INTERVAL_S);
+
+/// Sets the announce interval; the running worker uses it from its next pass.
+///
+/// # Errors
+/// [`PublishError::Config`] below [`MIN_ANNOUNCE_INTERVAL_S`].
+#[uniffi::export]
+pub fn publish_set_announce_interval(seconds: u64) -> Result<(), PublishError> {
+    if seconds < MIN_ANNOUNCE_INTERVAL_S {
+        return Err(PublishError::Config {
+            reason: format!("announce interval must be at least {MIN_ANNOUNCE_INTERVAL_S} s"),
+        });
+    }
+    ANNOUNCE_INTERVAL_S.store(seconds, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Announces the app now (or as soon as the hub link is up), so peers can reach it.
+#[uniffi::export]
+pub fn publish_announce() {
+    send_cmd(Cmd::Announce);
 }
 
 /// Re-sends the exact bytes of the last sent fix (replay check).
@@ -451,6 +483,10 @@ fn backend_and_outbox(
 }
 
 /// The worker thread: owns the runtime, transport and backend; `send` blocks here only.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one loop owns the runtime, transport, outbox and their per-connection state"
+)]
 fn run(
     dir: &Path,
     hub_address: &str,
@@ -482,7 +518,7 @@ fn run(
 
     let mut slot: Option<TelemetrySample> = None;
     let mut resend = false;
-    let mut announced = false;
+    let mut last_announce: Option<Instant> = None; // None: announce on the next connected pass
     let mut create: Option<Vec<u8>> = None;
     let mut created = false;
     let mut last_sent: Option<Vec<u8>> = None;
@@ -493,6 +529,7 @@ fn run(
             match next {
                 Ok(Cmd::Fix(sample)) => slot = Some(sample),
                 Ok(Cmd::ResendLast) => resend = true,
+                Ok(Cmd::Announce) => last_announce = None,
                 Ok(Cmd::Marker {
                     change,
                     record,
@@ -518,13 +555,15 @@ fn run(
         if !connected {
             // The create is fire-and-forget; re-send its stored bytes on the next
             // connection (the hub de-duplicates them by command_id).
-            announced = false;
+            last_announce = None;
             created = false;
             continue;
         }
-        if !announced {
+        let every = Duration::from_secs(ANNOUNCE_INTERVAL_S.load(Ordering::Relaxed));
+        if last_announce.is_none_or(|at| at.elapsed() >= every) {
             runtime.block_on(transport.send_announce(&destination, announce_data.as_deref()));
-            announced = true;
+            last_announce = Some(Instant::now());
+            update(|s| s.last_announce_s = Some(now_s()));
         }
 
         if !created {
@@ -843,5 +882,13 @@ mod tests {
                 Err(PublishError::Config { .. })
             ));
         }
+    }
+
+    #[test]
+    fn announce_interval_has_a_floor() {
+        assert!(publish_set_announce_interval(MIN_ANNOUNCE_INTERVAL_S - 1).is_err());
+        assert!(publish_set_announce_interval(MIN_ANNOUNCE_INTERVAL_S).is_ok());
+        assert!(publish_set_announce_interval(DEFAULT_ANNOUNCE_INTERVAL_S).is_ok());
+        assert_eq!(ANNOUNCE_INTERVAL_S.load(Ordering::Relaxed), 1800);
     }
 }

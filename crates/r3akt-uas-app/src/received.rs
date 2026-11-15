@@ -4,6 +4,7 @@
 //! and the map; everything else is ignored. Nothing here reaches the DJI interface (UAS-PRD-012).
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use lxmf_core::inbound_decode::{InboundPayloadMode, decode_inbound_message};
@@ -34,6 +35,37 @@ pub struct ReceivedMarker {
 // shortcut: kept in memory only, so a restart shows nothing until the hub sends again; persist when REM-style replay is needed.
 static MARKERS: Mutex<BTreeMap<String, ReceivedMarker>> = Mutex::new(BTreeMap::new());
 
+// What reached the receiver, for the LOG report: packets to any destination, packets and
+// resources for the app, LXMF messages decoded, messages with RCH events, marker events applied.
+static COUNTS: [AtomicU64; 6] = [const { AtomicU64::new(0) }; 6];
+const ANY: usize = 0;
+const OURS: usize = 1;
+const RESOURCES: usize = 2;
+const DECODED: usize = 3;
+const WITH_EVENTS: usize = 4;
+const APPLIED: usize = 5;
+
+fn count(which: usize) {
+    COUNTS[which].fetch_add(1, Ordering::Relaxed);
+}
+
+/// One line for the LOG report: how far received data got.
+#[uniffi::export]
+#[must_use]
+pub fn received_report() -> String {
+    let n = |i: usize| COUNTS[i].load(Ordering::Relaxed);
+    format!(
+        "received: packets {} (tried as LXMF {}), resources {}, LXMF decoded {}, with RCH events {}, marker events applied {}, markers shown {}",
+        n(ANY),
+        n(OURS),
+        n(RESOURCES),
+        n(DECODED),
+        n(WITH_EVENTS),
+        n(APPLIED),
+        lock().len()
+    )
+}
+
 /// The received team markers, newest update first.
 #[uniffi::export]
 #[must_use]
@@ -57,17 +89,28 @@ pub(crate) fn spawn(transport: &Arc<Transport>, address: AddressHash) {
     let mut data = transport.received_data_events();
     tokio::spawn(async move {
         loop {
-            match data.recv().await {
-                Ok(event) if event.destination.as_slice() == destination => {
+            let event = data.recv().await;
+            if event.is_ok() {
+                count(ANY);
+            }
+            match event {
+                // Single packets name our destination and strip it from the data. Link data
+                // (RCH's direct delivery) names the link instead and carries the full message,
+                // whose own destination `receive` checks, as REM does.
+                Ok(event) => {
                     let mode = match event.payload_mode {
                         ReceivedPayloadMode::FullWire => InboundPayloadMode::FullWire,
-                        ReceivedPayloadMode::DestinationStripped => {
+                        ReceivedPayloadMode::DestinationStripped
+                            if event.destination.as_slice() == destination =>
+                        {
                             InboundPayloadMode::DestinationStripped
                         }
+                        ReceivedPayloadMode::DestinationStripped => continue,
                     };
+                    count(OURS);
                     receive(destination, event.data.as_slice(), mode, now_ms());
                 }
-                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
@@ -79,6 +122,7 @@ pub(crate) fn spawn(transport: &Arc<Transport>, address: AddressHash) {
             match resources.recv().await {
                 Ok(event) => {
                     if let ResourceEventKind::Complete(complete) = event.kind {
+                        count(RESOURCES);
                         receive(
                             destination,
                             &complete.data,
@@ -102,6 +146,7 @@ fn receive(destination: [u8; 16], payload: &[u8], mode: InboundPayloadMode, now:
     if message.destination != destination {
         return;
     }
+    count(DECODED);
     let sender = hex(&message.source);
     // The decoded fields as JSON, as the shared `sensor_frame::decode_json` reads them.
     let Some(events) = message
@@ -111,6 +156,7 @@ fn receive(destination: [u8; 16], payload: &[u8], mode: InboundPayloadMode, now:
     else {
         return;
     };
+    count(WITH_EVENTS);
     apply(events, &sender, now);
 }
 
@@ -138,6 +184,7 @@ fn apply(events: serde_json::Value, sender: &str, now: i64) {
             && let Ok(record) = from_api_value(&event.payload, id.clone())
         {
             let existing = markers.get(&id).map(|m| record_of(&m.marker));
+            count(APPLIED);
             if supersedes(&record, existing.as_ref()) {
                 markers.insert(
                     id,

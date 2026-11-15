@@ -55,6 +55,7 @@ object Dji4Source : AircraftSource {
         }
             ?: onResult("No video server set: SETTINGS → VIDEO SERVER")
         FlightAction.STREAM_STOP -> Dji4Sdk.stopStream(onResult)
+        FlightAction.ANNOUNCE -> onResult("Announcing needs a publish build")
         else -> flight(action, onResult)
     }
 
@@ -71,7 +72,7 @@ object Dji4Source : AircraftSource {
             FlightAction.VIDEO_MODE -> Dji4Action.VIDEO_MODE
             FlightAction.GIMBAL_DOWN -> Dji4Action.GIMBAL_DOWN
             FlightAction.GIMBAL_LEVEL -> Dji4Action.GIMBAL_LEVEL
-            FlightAction.STREAM_START, FlightAction.STREAM_STOP -> error("not a flight action")
+            FlightAction.STREAM_START, FlightAction.STREAM_STOP, FlightAction.ANNOUNCE -> error("not a flight action")
         },
         onResult,
     )

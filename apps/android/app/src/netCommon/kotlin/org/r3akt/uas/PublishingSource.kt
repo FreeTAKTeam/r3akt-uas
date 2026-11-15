@@ -11,11 +11,15 @@ import org.r3akt.uas.bridge.OwnMarker
 import org.r3akt.uas.bridge.PublishState
 import org.r3akt.uas.bridge.TelemetrySample
 import org.r3akt.uas.bridge.markerList
+import org.r3akt.uas.bridge.publishAnnounce
 import org.r3akt.uas.bridge.publishOfferFix
+import org.r3akt.uas.bridge.publishSetAnnounceInterval
 import org.r3akt.uas.bridge.publishStart
 import org.r3akt.uas.bridge.publishStatus
 import org.r3akt.uas.bridge.publishStop
 import org.r3akt.uas.bridge.receivedMarkers
+import org.r3akt.uas.bridge.receivedReport
+import org.r3akt.uas.hud.FlightAction
 import org.r3akt.uas.hud.HudState
 import org.r3akt.uas.hud.HudView
 import java.io.File
@@ -52,8 +56,13 @@ class PublishingSource(
     // Start and stop run here, in order: stop can block for one send's path wait (POST F1).
     private val worker = Executors.newSingleThreadExecutor()
 
+    private var app: Application? = null
+    /** The announce interval last handed to the publisher, so a SETTINGS change applies while running. */
+    @Volatile private var announceS = 0L
+
     override fun install(app: Application) {
         inner.install(app)
+        this.app = app
         storeDir = File(app.noBackupFilesDir, storeName).path
         app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             // The cockpit only: DJI's USB accessory activity also pauses it on a controller reconnect.
@@ -139,9 +148,18 @@ class PublishingSource(
         worker.execute { publishStop() }
     }
 
+    override fun perform(action: FlightAction, onResult: (String?) -> Unit) =
+        if (action != FlightAction.ANNOUNCE) inner.perform(action, onResult)
+        else if (!publishing) onResult("Start publishing first: LOG → START PUBLISH")
+        else { publishAnnounce(); onResult(null) }
+
     override fun cockpit(seq: UInt): HudState {
         val state = inner.cockpit(seq)
         if (!publishing) return if (stoppedByPause) state.copy(status = "${state.status} · PUBLISH STOPPED") else state
+        app?.let(Prefs::announceIntervalS)?.takeIf { it != announceS }?.let {
+            announceS = it
+            runCatching { publishSetAnnounceInterval(it.toULong()) }
+        }
         fix(seq)?.let {
             lastSeq = seq
             lastFix = it
@@ -151,7 +169,11 @@ class PublishingSource(
         worker.execute { markerCache = runCatching { markerList() }.getOrDefault(markerCache) }
         val status = publishStatus()
         // MESH is on while the Reticulum interface to the hub reports its stream connected.
-        return state.copy(status = "${state.status} · ${status.state.name} ${status.fixesSent}", mesh = status.hubConnected)
+        return state.copy(
+            status = "${state.status} · ${status.state.name} ${status.fixesSent}",
+            mesh = status.hubConnected,
+            actions = state.actions + FlightAction.ANNOUNCE,
+        )
     }
 
     override fun describe(): String = inner.describe() + "\n" + publicationReport()
@@ -168,6 +190,8 @@ class PublishingSource(
             appendLine("state ${s.state.name}${if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""}")
             appendLine("hub connected ${s.hubConnected}, create sent ${s.createSent}, fixes sent ${s.fixesSent}")
             appendLine("operator markers waiting for the hub: ${s.markersPending}")
+            appendLine(receivedReport())
+            appendLine("last announce ${s.lastAnnounceS?.let { "${System.currentTimeMillis() / 1000 - it} s ago" } ?: "-"}, every ${announceS.takeIf { it > 0 } ?: "-"} s")
             val fix = s.lastSentFix
             appendLine(
                 if (fix == null) "last sent fix -"
