@@ -37,4 +37,5 @@ SDK-advertised support and physically tested support are separate columns. No ai
 | Aircraft | Controller | Android device | SDK-advertised (source) | Physically tested | Evidence |
 |---|---|---|---|---|---|
 | — | — | — | to be copied from DJI's SDK 4.18 release notes at milestone 4 | none | — |
+| not in the session record (owner to confirm; D-14 names the Mavic Air 2) | to confirm | Pixel 7, Android 17 (API 37) | — | one flight, 15 November 2026: take-off and landing from the app, live values, photo/video mode | [first flight](../evidence/dji-net-first-flight.md) |
 | none | none | Pixel 7, Android 17 (API 37) | — | app only: start, registration call, cockpit and action refusal without an aircraft | [acceptance.md](../specification/acceptance.md) milestone 4 record |
