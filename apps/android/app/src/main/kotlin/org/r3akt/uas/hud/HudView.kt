@@ -88,11 +88,11 @@ class HudView(context: Context) : ViewGroup(context) {
     private val menu = button(Hud.menu, "MENU")
     private val map = button(Hud.map, "MAP").apply { contentDescription = "Map" }
     private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations" }
-    private val radar = button(null, "RADAR").apply { contentDescription = "Radar" }
-    private val setup = button(null, "SETUP").apply { contentDescription = "Connection and setup" }
-    private val stream = button(null, "STREAM")
-    private val announce = button(null, "ANNOUNCE").apply { contentDescription = "Announce this app to the mesh" }
-    private val sessions = button(null, "HIST").apply { contentDescription = "Sessions and recordings" }
+    private val radar = button(Hud.radar, "RADAR").apply { contentDescription = "Radar" }
+    private val setup = button(Hud.setup, "SETUP").apply { contentDescription = "Connection and setup" }
+    private val stream = button(Hud.stream, "STREAM")
+    private val announce = button(Hud.announce, "ANNOUNCE").apply { contentDescription = "Announce this app to the mesh" }
+    private val sessions = button(Hud.history, "HIST").apply { contentDescription = "Sessions and recordings" }
     // Invisible: the small radar is drawn below; this only takes the tap.
     private val radarTap = View(context).apply { contentDescription = "Open the radar"; isFocusable = true }
     private val log = button(Hud.log, "LOG").apply { contentDescription = "Session log" }
@@ -125,7 +125,7 @@ class HudView(context: Context) : ViewGroup(context) {
         add(setup, 756f, 416f, 60f, 52f, Anchor.RIGHT)
         add(sessions, 820f, 416f, 60f, 52f, Anchor.RIGHT)
         add(stream, 888f, 416f, 60f, 52f, Anchor.RIGHT)
-        add(announce, 888f, 356f, 60f, 52f, Anchor.RIGHT)
+        add(announce, 628f, 416f, 60f, 52f, Anchor.RIGHT)
         add(slider, 308f, 266f, 344f, 52f, Anchor.CENTER)
         add(cancel, 562f, 330f, 90f, 44f, Anchor.CENTER)
         add(dismiss, 642f, 408f, 44f, 44f, Anchor.CENTER)

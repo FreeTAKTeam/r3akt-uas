@@ -57,9 +57,16 @@ class HudButton(
         invalidate()
     }
 
+    // Redraws on press and release, so a tap shows at once (inverted while held).
+    override fun drawableStateChanged() {
+        super.drawableStateChanged()
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         val k = unit()
         val dim = !isEnabled
+        val down = isPressed && !dim
         val frameColor = when {
             dim -> Hud.DIM
             tone == Tone.CAUTION -> Hud.AMBER
@@ -68,6 +75,7 @@ class HudButton(
         }
         val ink = when {
             dim -> Hud.DIM
+            down -> if (tone == Tone.CAUTION) Hud.INK_CAUTION else Hud.INK_GO
             tone == Tone.GO -> Hud.INK_GO
             tone == Tone.CAUTION && !bare -> Hud.INK_CAUTION
             tone == Tone.CAUTION -> Hud.AMBER
@@ -79,7 +87,7 @@ class HudButton(
         if (shutter) {
             paint.reset()
             paint.isAntiAlias = true
-            paint.color = Hud.PLATE
+            paint.color = if (down) frameColor else Hud.PLATE
             canvas.drawCircle(w / 2, h / 2, w / 2 - 1.5f * k, paint)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 3 * k
@@ -101,7 +109,7 @@ class HudButton(
             box.set(0.75f * k, 0.75f * k, w - 0.75f * k, h - 0.75f * k)
             paint.reset()
             paint.isAntiAlias = true
-            paint.color = when (tone) {
+            paint.color = if (down) frameColor else when (tone) {
                 Tone.GO -> if (dim) Hud.PLATE else Hud.GREEN
                 Tone.CAUTION -> if (dim) Hud.PLATE else Hud.AMBER
                 Tone.NORMAL -> Hud.PLATE
@@ -119,7 +127,7 @@ class HudButton(
         val gap = if (icon == null || label.isEmpty()) 0f else 3 * k
         val textSize = 10 * k
         var top = (h - iconSize - gap - if (label.isEmpty()) 0f else textSize) / 2
-        val halo = tone == Tone.NORMAL || bare || dim
+        val halo = !down && (tone == Tone.NORMAL || bare || dim)
         icon?.let { draw ->
             path.reset()
             path.draw()
@@ -281,6 +289,25 @@ object Hud {
     val observation: Icon = {
         addCircle(12f, 12f, 7f, Path.Direction.CW)
         moveTo(12f, 2f); lineTo(12f, 7f); moveTo(12f, 17f); lineTo(12f, 22f); moveTo(2f, 12f); lineTo(7f, 12f); moveTo(17f, 12f); lineTo(22f, 12f)
+    }
+    val radar: Icon = {
+        addCircle(12f, 12f, 9f, Path.Direction.CW); addCircle(12f, 12f, 4.5f, Path.Direction.CW)
+        moveTo(12f, 12f); lineTo(18.5f, 5.5f)
+    }
+    val setup: Icon = {
+        for (y in listOf(6f, 12f, 18f)) { moveTo(3f, y); lineTo(21f, y) }
+        addCircle(8f, 6f, 2f, Path.Direction.CW); addCircle(16f, 12f, 2f, Path.Direction.CW); addCircle(10f, 18f, 2f, Path.Direction.CW)
+    }
+    val history: Icon = { addCircle(12f, 12f, 9f, Path.Direction.CW); moveTo(12f, 7f); lineTo(12f, 12f); lineTo(16f, 14f) }
+    val stream: Icon = {
+        addCircle(12f, 12f, 1.8f, Path.Direction.CW)
+        addArc(7f, 7f, 17f, 17f, 135f, 90f); addArc(7f, 7f, 17f, 17f, -45f, 90f)
+        addArc(3f, 3f, 21f, 21f, 135f, 90f); addArc(3f, 3f, 21f, 21f, -45f, 90f)
+    }
+    val announce: Icon = {
+        moveTo(12f, 11f); lineTo(12f, 21f); moveTo(8f, 21f); lineTo(16f, 21f)
+        addCircle(12f, 9f, 1.5f, Path.Direction.CW)
+        addArc(7f, 4f, 17f, 14f, 200f, 140f); addArc(3f, 0f, 21f, 18f, 205f, 130f)
     }
     val log: Icon = { for (y in listOf(6f, 12f, 18f)) { moveTo(9f, y); lineTo(21f, y); moveTo(4f, y); lineTo(5f, y) } }
 }
