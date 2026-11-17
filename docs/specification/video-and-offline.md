@@ -17,4 +17,9 @@ Status: **specified, not implemented.** Source: [PLAN.md](../goals/bootstrap/PLA
 | **UAS-VID-011** | R3S's post-admission revocation limitation (the pinned LXMF daemon cannot cancel a retry it already admitted) is an upstream qualification gate before operational release. |
 | **UAS-VID-012** | Telemetry and video fail independently: losing one does not stop the other. |
 
+Local application storage (UAS-VID-009):
+
+- `files/sessions/`: the session record. No shared store holds cockpit events; bounded by `SessionLog` (newest sessions, size per session).
+- `aircraft-media/` in the app's external files directory: photos and video copied from the aircraft's card on the operator's request (DJI builds). The aircraft keeps its own copy; this is the only way to keep a recording when no network is available. Each file is one operator choice, so the bound is the phone's free space; the files are readable over USB and removed with the app.
+
 Example MediaMTX configuration, without credentials: [packaging/mediamtx/mediamtx.example.yml](../../packaging/mediamtx/mediamtx.example.yml).

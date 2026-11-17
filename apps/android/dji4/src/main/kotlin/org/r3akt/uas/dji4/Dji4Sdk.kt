@@ -8,12 +8,16 @@ import dji.common.error.DJISDKError
 import dji.common.camera.SettingsDefinitions
 import dji.common.camera.SystemState
 import dji.common.flightcontroller.FlightControllerState
+import dji.common.flightcontroller.FlightMode
 import dji.common.gimbal.Rotation
 import dji.common.gimbal.RotationMode
 import dji.common.flightcontroller.GPSSignalLevel
 import dji.common.util.CommonCallbacks
 import dji.sdk.base.BaseComponent
 import dji.sdk.base.BaseProduct
+import dji.sdk.camera.Camera
+import dji.sdk.media.DownloadListener
+import dji.sdk.media.MediaFile
 import dji.sdk.products.Aircraft
 import dji.sdk.sdkmanager.DJISDKInitEvent
 import dji.sdk.sdkmanager.DJISDKManager
@@ -23,6 +27,7 @@ import dji.sdk.sdkmanager.LiveVideoResolution
 import org.r3akt.uas.bridge.AircraftPose
 import org.r3akt.uas.bridge.DjiFlightState
 import org.r3akt.uas.bridge.normalizeDji
+import java.io.File
 import kotlin.concurrent.thread
 
 enum class Dji4Link { NO_KEY, REGISTERING, REGISTRATION_FAILED, NO_AIRCRAFT, CONNECTED }
@@ -32,6 +37,9 @@ enum class Dji4Action { TAKEOFF, LAND, RTH, STOP_RTH, PHOTO, RECORD_START, RECOR
 
 /** Camera shooting mode as reported; playback, download and others read as `null`. */
 enum class Dji4CameraMode { PHOTO, VIDEO }
+
+/** One file on the aircraft's SD card as reported; `null` = not reported. */
+data class Dji4Media(val name: String, val sizeBytes: Long?, val created: String?, val durationS: Float?, val video: Boolean?)
 
 /** What the aircraft reports right now. `null` means not reported, never zero. */
 data class Dji4State(
@@ -44,6 +52,8 @@ data class Dji4State(
     val flying: Boolean?,
     val motorsOn: Boolean?,
     val goingHome: Boolean,
+    /** A DJI landing mode, from LAND or the end of a return home. */
+    val landing: Boolean,
     val flightMode: String?,
     val satellites: Int?,
     /** DJI `GPSSignalLevel` 0..5; `null` when DJI reports NONE. */
@@ -171,6 +181,8 @@ object Dji4Sdk {
         gimbalYawRelative = null
         camera = null
         linkQuality = null
+        mediaFiles = emptyList()
+        mediaReturn = null
         // A stream never outlives its aircraft or restarts by itself on a reconnect.
         runCatching { if (isStreaming()) liveStream?.stopStream() }
         if (link == Dji4Link.CONNECTED) link = Dji4Link.NO_AIRCRAFT
@@ -183,6 +195,7 @@ object Dji4Sdk {
         val product = aircraft.takeIf { live }
         val fc = flight.takeIf { live }
         val cam = camera.takeIf { live }
+        val landing = fc?.flightMode in LANDING_MODES
         // All DJI value normalization lives in the Rust integration (UAS-ARC-005).
         val pose = fc?.let {
             val at = it.aircraftLocation
@@ -205,7 +218,9 @@ object Dji4Sdk {
             pose = pose,
             flying = fc?.isFlying,
             motorsOn = fc?.areMotorsOn(),
-            goingHome = fc?.isGoingHome == true,
+            // DJI also reports "going home" during a plain LAND (flight log, 15 November 2026).
+            goingHome = fc?.isGoingHome == true && !landing,
+            landing = landing,
             flightMode = fc?.flightModeString,
             satellites = fc?.satelliteCount,
             gpsLevel = fc?.gpsSignalLevel?.takeIf { it != GPSSignalLevel.NONE }?.value(),
@@ -224,6 +239,10 @@ object Dji4Sdk {
             linkPercent = linkQuality.takeIf { live },
             streaming = live && isStreaming(),
         )
+    }
+
+    private val LANDING_MODES by lazy {
+        setOf(FlightMode.AUTO_LANDING, FlightMode.ATTI_LANDING, FlightMode.CONFIRM_LANDING, FlightMode.MOTOR_STOP_LANDING)
     }
 
     private fun cameraMode(st: SystemState): Dji4CameraMode? =
@@ -290,15 +309,16 @@ object Dji4Sdk {
     @Volatile private var streamError: String? = null
     private val liveStream get() = runCatching { DJISDKManager.getInstance().liveStreamManager }.getOrNull()
 
-    private val RESOLUTIONS = listOf(
+    // Lazy: this object's static init must not resolve DJI types (no DJI classes on x86 emulators).
+    private val RESOLUTIONS by lazy { listOf(
         LiveVideoResolution.VIDEO_RESOLUTION_480_360, LiveVideoResolution.VIDEO_RESOLUTION_720_540,
         LiveVideoResolution.VIDEO_RESOLUTION_960_540, LiveVideoResolution.VIDEO_RESOLUTION_960_720,
         LiveVideoResolution.VIDEO_RESOLUTION_1280_720, LiveVideoResolution.VIDEO_RESOLUTION_1280_960,
         LiveVideoResolution.VIDEO_RESOLUTION_1440_1080, LiveVideoResolution.VIDEO_RESOLUTION_1920_1080,
-    )
+    ) }
 
-    private val onStreamError = LiveStreamManager.OnLiveErrorStatusListener { code, message ->
-        streamError = "code $code: ${message ?: "no message"}"
+    private val onStreamError by lazy {
+        LiveStreamManager.OnLiveErrorStatusListener { code, message -> streamError = "code $code: ${message ?: "no message"}" }
     }
 
     private fun isStreaming() = runCatching { liveStream?.isStreaming == true }.getOrDefault(false)
@@ -336,6 +356,93 @@ object Dji4Sdk {
 
     fun stopStream(onResult: (String?) -> Unit) {
         onResult(runCatching { liveStream?.stopStream(); null }.getOrElse { it.message ?: it.toString() })
+    }
+
+    // Aircraft media (UAS-VID-008). Download mode takes the camera away from shooting, so it is entered only
+    // on the ground with nothing recording or streaming, and left by [closeMedia] (the SESSIONS page closing).
+    @Volatile private var mediaFiles: List<MediaFile> = emptyList()
+    /** The shooting mode to restore on [closeMedia]; non-null while download mode was entered by this app. */
+    @Volatile private var mediaReturn: Dji4CameraMode? = null
+
+    /** Lists the SD card; [onResult] gets the files or DJI's error text, possibly on another thread. */
+    fun listMedia(onResult: (List<Dji4Media>?, String?) -> Unit) {
+        val s = state()
+        val cam = aircraft?.camera.takeIf { s.link == Dji4Link.CONNECTED } ?: return onResult(null, "No aircraft camera connected")
+        if (s.flying != false) return onResult(null, "Land first: media download takes the camera away from shooting")
+        if (s.recording == true || s.streaming) return onResult(null, "Stop recording and the live stream first")
+        val mm = cam.mediaManager ?: return onResult(null, "This camera offers no media download")
+        val refresh = {
+            mm.refreshFileListOfStorageLocation(SettingsDefinitions.StorageLocation.SDCARD) { e ->
+                if (e != null) return@refreshFileListOfStorageLocation onResult(null, e.description)
+                val files = mm.sdCardFileListSnapshot.orEmpty()
+                mediaFiles = files
+                onResult(files.map(::media), null)
+            }
+        }
+        runCatching {
+            if (mediaReturn != null) return@runCatching refresh()
+            enterMedia(cam) { e ->
+                if (e != null) return@enterMedia onResult(null, e.description)
+                mediaReturn = s.cameraMode ?: Dji4CameraMode.PHOTO
+                refresh()
+            }
+        }.onFailure { onResult(null, it.message ?: it.toString()) }
+    }
+
+    private fun enterMedia(cam: Camera, done: CommonCallbacks.CompletionCallback<DJIError>) = when {
+        flatMode -> cam.enterPlayback(done)
+        cam.isMediaDownloadModeSupported -> cam.setMode(SettingsDefinitions.CameraMode.MEDIA_DOWNLOAD, done)
+        else -> done.onResult(DJIError.COMMON_UNSUPPORTED)
+    }
+
+    private fun media(f: MediaFile) = Dji4Media(
+        name = f.fileName,
+        sizeBytes = f.fileSize.takeIf { it > 0 },
+        created = f.dateCreated?.takeIf { it.isNotBlank() },
+        durationS = f.durationInSeconds.takeIf { it > 0f },
+        video = when (f.mediaType) {
+            null, MediaFile.MediaType.UNKNOWN -> null
+            MediaFile.MediaType.MOV, MediaFile.MediaType.MP4 -> true
+            else -> false
+        },
+    )
+
+    /**
+     * Copies [name] from the listed SD card into [dir]. [onDone] gets the file, or DJI's error text with any
+     * partial file removed, so a half download is never kept as a recording. Callbacks may come on any thread.
+     */
+    fun downloadMedia(name: String, dir: File, onProgress: (Long, Long) -> Unit, onDone: (File?, String?) -> Unit) {
+        val file = mediaFiles.firstOrNull { it.fileName == name }
+            .takeIf { link == Dji4Link.CONNECTED && mediaReturn != null } ?: return onDone(null, "List the aircraft media again")
+        val target = File(dir, name)
+        runCatching {
+            dir.mkdirs()
+            file.fetchFileData(dir, name.substringBeforeLast('.'), object : DownloadListener<String> {
+                override fun onStart() {}
+                override fun onRateUpdate(total: Long, current: Long, perSize: Long) {}
+                override fun onRealtimeDataUpdate(data: ByteArray?, position: Long, isLast: Boolean) {}
+                override fun onProgress(total: Long, current: Long) = onProgress(current, total)
+                override fun onSuccess(path: String?) = onDone(target.takeIf { it.isFile } ?: path?.let(::File), null)
+                override fun onFailure(error: DJIError?) {
+                    target.delete()
+                    onDone(null, error?.description ?: "Download failed, no error reported")
+                }
+            })
+        }.onFailure { target.delete(); onDone(null, it.message ?: it.toString()) }
+    }
+
+    /** Leaves download mode and restores the shooting mode it replaced; does nothing if it was never entered. */
+    fun closeMedia() {
+        val back = mediaReturn ?: return
+        mediaReturn = null
+        mediaFiles = emptyList()
+        val cam = aircraft?.camera.takeIf { link == Dji4Link.CONNECTED } ?: return
+        // The outcome shows in the cockpit's camera mode; nothing else waits on it.
+        val ignore = CommonCallbacks.CompletionCallback<DJIError> {}
+        runCatching {
+            if (flatMode) cam.exitPlayback(ignore)
+            else cam.setMode(if (back == Dji4CameraMode.VIDEO) SettingsDefinitions.CameraMode.RECORD_VIDEO else SettingsDefinitions.CameraMode.SHOOT_PHOTO, ignore)
+        }
     }
 
     private fun pitchTo(deg: Float) = Rotation.Builder().mode(RotationMode.ABSOLUTE_ANGLE).pitch(deg).time(1.0).build()
