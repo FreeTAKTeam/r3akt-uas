@@ -10,6 +10,8 @@ enum class FlightAction {
     GIMBAL_DOWN, GIMBAL_LEVEL,
     /** Live video to the configured video server (UAS-VID-001); started only by the operator. */
     STREAM_START, STREAM_STOP,
+    /** Announce the app on the mesh now, so peers can open a link to it (publish builds). */
+    ANNOUNCE,
 }
 
 /** The camera's shooting mode as reported; anything else (playback, download) is unknown. */

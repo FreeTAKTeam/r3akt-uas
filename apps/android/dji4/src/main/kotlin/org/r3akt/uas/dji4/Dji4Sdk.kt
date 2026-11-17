@@ -461,7 +461,7 @@ object Dji4Sdk {
     fun firmware(): String? = aircraft.takeIf { link == Dji4Link.CONNECTED }
         ?.let { runCatching { it.firmwarePackageVersion }.getOrNull() }?.takeIf { it.isNotBlank() }
 
-    /** Status for the cockpit's LOG dialog. */
+    /** Status for the cockpit's MESH dialog. */
     fun describe(): String {
         val s = state()
         return buildString {

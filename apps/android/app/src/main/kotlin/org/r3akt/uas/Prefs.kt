@@ -25,6 +25,9 @@ enum class StreamQuality(val label: String, val width: Int?, val height: Int?, v
 object Prefs {
     /** Radar ranges in metres (UAS-RAD-002); the first is the default. */
     val RADAR_RANGES_M = listOf(500, 1000, 2000, 5000)
+    /** Hub announce interval (publish builds); the floor matches the Rust publisher's. */
+    const val ANNOUNCE_DEFAULT_S = 1800L
+    const val ANNOUNCE_MIN_S = 60L
 
     private fun prefs(context: Context) = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
 
@@ -63,5 +66,13 @@ object Prefs {
     fun setRadarRangeM(context: Context, metres: Int) {
         require(metres in RADAR_RANGES_M)
         prefs(context).edit().putInt("radar_range_m", metres).apply()
+    }
+
+    fun announceIntervalS(context: Context): Long =
+        prefs(context).getLong("announce_interval_s", ANNOUNCE_DEFAULT_S).coerceAtLeast(ANNOUNCE_MIN_S)
+
+    fun setAnnounceIntervalS(context: Context, seconds: Long) {
+        require(seconds >= ANNOUNCE_MIN_S)
+        prefs(context).edit().putLong("announce_interval_s", seconds).apply()
     }
 }

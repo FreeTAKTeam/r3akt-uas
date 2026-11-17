@@ -9,7 +9,7 @@ import org.r3akt.uas.hud.Hud
 
 /**
  * Detections (not built: UAS-OBS-001) and the markers this app placed, with the same
- * operations as the LOG's MARKERS panel ([MarkerList]) in publish builds.
+ * operations as the MESH dialog's MARKERS panel ([MarkerList]) in publish builds.
  */
 class ObservationsScreen(activity: Activity, close: () -> Unit) : ScreenPage {
     private val frame = PageFrame(activity, Screen.OBSERVATIONS.title, close)

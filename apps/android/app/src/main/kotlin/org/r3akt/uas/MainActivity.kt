@@ -97,7 +97,7 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        // Started either way: a refusal shows up as DJI's own registration error in the LOG.
+        // Started either way: a refusal shows up as DJI's own registration error in the MESH report.
         if (requestCode == INTERNET_REQUEST) Variant.source.start(this)
     }
 

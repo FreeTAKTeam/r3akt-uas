@@ -5,6 +5,8 @@ import android.content.Context
 import android.view.View
 import org.r3akt.uas.bridge.AltitudeReference
 import org.r3akt.uas.bridge.TelemetrySample
+import org.r3akt.uas.bridge.CameraPose
+import org.r3akt.uas.bridge.djiCameraPose
 import org.r3akt.uas.bridge.djiSample
 import org.r3akt.uas.dji4.Dji4Action
 import org.r3akt.uas.dji4.Dji4CameraMode
@@ -53,6 +55,7 @@ object Dji4Source : AircraftSource {
         }
             ?: onResult("No video server set: SETTINGS → VIDEO SERVER")
         FlightAction.STREAM_STOP -> Dji4Sdk.stopStream(onResult)
+        FlightAction.ANNOUNCE -> onResult("Announcing needs a publish build")
         else -> flight(action, onResult)
     }
 
@@ -69,7 +72,7 @@ object Dji4Source : AircraftSource {
             FlightAction.VIDEO_MODE -> Dji4Action.VIDEO_MODE
             FlightAction.GIMBAL_DOWN -> Dji4Action.GIMBAL_DOWN
             FlightAction.GIMBAL_LEVEL -> Dji4Action.GIMBAL_LEVEL
-            FlightAction.STREAM_START, FlightAction.STREAM_STOP -> error("not a flight action")
+            FlightAction.STREAM_START, FlightAction.STREAM_STOP, FlightAction.ANNOUNCE -> error("not a flight action")
         },
         onResult,
     )
@@ -167,7 +170,7 @@ object Dji4Source : AircraftSource {
             },
             Dji4Sdk.firmware()?.let { SetupItem("Firmware", SetupState.OK, it) }
                 ?: SetupItem("Firmware", SetupState.UNKNOWN, if (connected) "Not reported by the SDK" else "No aircraft connected"),
-            // The decoder's health is in the LOG report; reading it here would reset its rate counters.
+            // The decoder's health is in the MESH report; reading it here would reset its rate counters.
             if (connected) SetupItem("Video", SetupState.UNKNOWN, "Primary feed opened behind the HUD; feed rate and decoder state: LOG")
             else SetupItem("Video", SetupState.WAITING, "No aircraft connected, no video"),
         )
@@ -193,5 +196,11 @@ object Dji4Source : AircraftSource {
             at.toULong(),
             System.currentTimeMillis().toULong(),
         )
+    }
+
+    /** Where the camera aims for [fix], or `null` without heading or gimbal angles: the rules are Rust's `dji_camera_pose`. */
+    fun cameraPose(fix: TelemetrySample): CameraPose? {
+        val d = Dji4Sdk.state()
+        return djiCameraPose(fix, d.pose?.headingDeg, d.gimbalYawRelativeDeg, d.gimbalPitchDeg)
     }
 }

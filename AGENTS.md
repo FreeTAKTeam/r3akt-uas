@@ -9,6 +9,7 @@ Do not add a Reticulum stack, transport manager, LXMF envelope, wire codec, rout
 - Rust: only `crates/r3akt-uas-app` (thin integration) and `tools/`. Shared crates are Git dependencies at immutable revisions in the root `Cargo.toml`; never a sibling path or branch.
 - Kotlin reaches Rust only through generated UniFFI bindings (`apps/android/native-bridge`); no hand-written JNI.
 - Flight commands stay local to the DJI interface; nothing received over the network commands the aircraft.
+- The app receives the LXMF messages addressed to it the way REM does: the shared transport's received-data and resource events, `lxmf-core`'s inbound decode, and the shared RCH and map decoders (UAS-PRD-013). It acts only on what it chooses to display, such as team markers, and ignores everything else.
 - Never fabricate data: unknown altitude reference, range, accuracy or heading stays unknown. Take-off-relative altitude is never MSL/HAE/AGL.
 - Simulator output is always marked simulated.
 - No credentials in the repository: DJI keys come from the `djiApiKey` Gradle property outside the repo.

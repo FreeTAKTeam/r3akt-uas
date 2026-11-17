@@ -30,6 +30,8 @@ pub struct CameraPose {
     pub elevation_error_deg: f64,
     /// Highest platform speed between the fix and the pose.
     pub max_speed_mps: f64,
+    /// The source's horizontal position bound, used only when the fix carries no accuracy.
+    pub horizontal_error_m: Option<f64>,
 }
 
 // Policy, not geometry: a pose older than this, a ray flatter than this or a point
@@ -69,7 +71,8 @@ pub fn camera_point(
     pose: &CameraPose,
     now_ms: u64,
 ) -> Result<GroundPoint, String> {
-    let origin = origin_position(fix);
+    let mut origin = origin_position(fix);
+    origin.accuracy_m = origin.accuracy_m.or(pose.horizontal_error_m);
     let ground = match (fix.altitude_reference, pose.ground_height_m) {
         (AltitudeReference::Unknown, _) => return Err(reason(GroundPointError::UnknownAltitude)),
         // AGL altitude is already the height above the ground below the aircraft.
