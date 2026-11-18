@@ -144,6 +144,9 @@ pub(crate) fn picture_message(
     )
 }
 
+/// Command ID prefix of an upload, so the hub's answer to it can be recognised.
+pub(crate) const UPLOAD_ID_PREFIX: &str = "uas-picture-upload-";
+
 /// The reduced image for the hub only (message 2): no team field, so RCH relays it to nobody.
 /// `message_id` is the picture marker message's LXMF message ID, the picture ID.
 pub(crate) fn upload_message(
@@ -154,7 +157,7 @@ pub(crate) fn upload_message(
     now_ms: i64,
 ) -> Result<Vec<u8>, String> {
     let command = MissionCommandEnvelope {
-        command_id: format!("uas-picture-upload-{message_id}"),
+        command_id: format!("{UPLOAD_ID_PREFIX}{message_id}"),
         source: RchSource::new(source),
         timestamp: r3akt_map_core::time::iso8601_from_unix_ms(now_ms),
         command_type: picture::UPLOAD_COMMAND.to_owned(),
@@ -392,8 +395,15 @@ pub fn marker_create_picture(
     let point = crate::camera::camera_point(&fix, &pose, u64::try_from(now).unwrap_or(0))
         .map_err(|e| refused(format!("no camera point: {e}")))?;
     let record = picture_record(name, &fix, &pose, &point, &capture, now).map_err(refused)?;
-    submit_picture(record.clone(), capture).map_err(refused)?;
+    // Saved before sharing, so a failed save never leaves a shared marker reported as not placed
+    // (issue #21). A refused share removes it again; one the worker may still finish keeps it.
     save(&dir, &record).map_err(refused)?;
+    if let Err(error) = submit_picture(record.clone(), capture) {
+        if error != crate::publish::NO_ANSWER {
+            let _ = remove(&dir, &record.object_destination_hash);
+        }
+        return Err(refused(error));
+    }
     Ok(OwnMarker::from(&record))
 }
 

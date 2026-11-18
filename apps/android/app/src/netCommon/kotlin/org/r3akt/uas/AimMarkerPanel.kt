@@ -62,6 +62,7 @@ class AimMarkerPanel(
     private val pictureOffered = cameraPose != null && offset == null
     private val problem = text("", 12f, Hud.AMBER, label)
     private var picture = false
+    private var closed = false
     private val place = HudButton(activity, { s }, label, null, "PLACE MARKER").apply { tone = HudButton.Tone.GO }
 
     fun show() {
@@ -193,10 +194,17 @@ class AimMarkerPanel(
         problem.text = ""
         place.isEnabled = false
         Variant.source.capturePicture { frame, note ->
+            val app = activity.applicationContext
+            // Cancelled while the camera answered (issue #22): the frame is dropped, never shared;
+            // a photo the camera already took stays on its card.
+            if (closed) {
+                frame?.recycle()
+                Toast.makeText(app, "$name cancelled: picture not shared" + (note?.let { " · $it" } ?: ""), Toast.LENGTH_LONG).show()
+                return@capturePicture
+            }
             place.isEnabled = true
             if (frame == null) { problem.text = "NO PICTURE: ${note ?: "not taken"}"; return@capturePicture }
             val takenMs = System.currentTimeMillis()
-            val app = activity.applicationContext
             pictureBusy = true
             close()
             Toast.makeText(app, "$name: picture taken, processing" + (note?.let { " · $it" } ?: ""), Toast.LENGTH_LONG).show()
@@ -220,11 +228,16 @@ class AimMarkerPanel(
         }
     }
 
+    // Once only, and never touching a newer panel's state when a late callback closes this one.
     private fun close() {
+        if (closed) return
+        closed = true
         keyboard(false)
         (root.parent as? ViewGroup)?.removeView(root)
-        hud.aimMarker = null
-        current = null
+        if (current === this) {
+            hud.aimMarker = null
+            current = null
+        }
     }
 
     private fun setName(name: String) {

@@ -61,7 +61,8 @@ RCH checks the sender is the marker's writer, checks the hash, and stores the im
 
 - Replies to upload and get come in **field 10** (`FIELD_RESULTS`), like every RCH command reply; the status is `result.status`.
 - `object_destination_hash` is required on a picture create; RCH refuses a create whose field-6 thumbnail does not match `picture.thumbnail.sha256`.
-- An upload that arrives before message 1 is stored is **refused** (`unknown_picture`), not held. The app's outbox sends oldest first, so message 1 goes first, but the app cannot read the refusal (G-17): a refused upload is not retried.
+- An upload that arrives before message 1 is stored is **refused** (`unknown_picture`), not held. The app's outbox delivers the oldest first, ordered by admission second then transient ID, so the app admits the upload one second after message 1 and message 1 always goes first (issue #21). The upload is deposited first: if message 1 cannot be deposited, nothing is reported placed and the lone upload is refused by the hub. The app reads the hub's refusal of an upload (field 10) and shows it on the MESH status; a refused upload is not retried.
+- Cancelling the panel while the camera answers drops the frame: nothing is shared, and a photo the camera already took stays on its card (issue #22).
 - Upload refusals: `unauthorized` (not the marker's writer), `invalid_payload`, `unknown_picture`, `conflict`. Get: `ok` (with field 6), `pending`, `unavailable`, `unauthorized` (`mission.content.read`, and the team check when field 11 is sent).
 - REM decode: `r3akt_map_core::marker_picture::decode_relay(fields_json, local_id)`, which drops a thumbnail whose hash does not match.
 - Known RCH gaps: deleting a marker keeps its pictures; the RCH web UI has no `picture` icon.
