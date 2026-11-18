@@ -37,4 +37,5 @@ SDK-advertised support and physically tested support are separate columns. No ai
 | Aircraft | Controller | Android device | SDK-advertised (source) | Physically tested | Evidence |
 |---|---|---|---|---|---|
 | — | — | — | to be copied from DJI's SDK 4.18 release notes at milestone 4 | none | — |
+| Mavic Air 2 (firmware not recorded) | standard remote controller, RC-N1 | Pixel 7, Android 17 (API 37) | — | two flights, 15 November 2026: take-off, landing and RTH from the app, live values, photo/video mode | [first flights](../evidence/dji-net-first-flight.md) |
 | none | none | Pixel 7, Android 17 (API 37) | — | app only: start, registration call, cockpit and action refusal without an aircraft | [acceptance.md](../specification/acceptance.md) milestone 4 record |
