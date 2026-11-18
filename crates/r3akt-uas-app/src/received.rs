@@ -158,7 +158,7 @@ fn receive(destination: [u8; 16], payload: &[u8], mode: InboundPayloadMode, now:
         return;
     };
     if let Some(results) = fields.get(FIELD_RESULTS.to_string()) {
-        for refusal in picture_refusals(results.clone()) {
+        for refusal in refusals(results.clone()) {
             crate::publish::report_error(refusal);
         }
     }
@@ -169,9 +169,9 @@ fn receive(destination: [u8; 16], payload: &[u8], mode: InboundPayloadMode, now:
     apply(events, &sender, now);
 }
 
-/// The hub's refusals of this app's picture uploads in a `FIELD_RESULTS` value (issue #21), so a
-/// refused photo is reported instead of staying pending without a word.
-fn picture_refusals(results: serde_json::Value) -> Vec<String> {
+/// The hub's refusals of this app's commands (marker changes, picture uploads) in a
+/// `FIELD_RESULTS` value, so a refused change is reported instead of looking sent.
+fn refusals(results: serde_json::Value) -> Vec<String> {
     let results: Vec<CommandResultEnvelope> = match results {
         serde_json::Value::Array(items) => items
             .into_iter()
@@ -183,11 +183,12 @@ fn picture_refusals(results: serde_json::Value) -> Vec<String> {
         .into_iter()
         .filter(|r| {
             r.status == CommandResultStatus::Rejected
-                && r.command_id.starts_with(crate::markers::UPLOAD_ID_PREFIX)
+                && r.command_id.starts_with(crate::markers::COMMAND_ID_PREFIX)
         })
         .map(|r| {
             format!(
-                "photo upload refused by the hub: {} {}",
+                "hub refused {}: {} {}",
+                r.command_id,
                 r.reason_code.as_deref().unwrap_or("rejected"),
                 r.reason.as_deref().unwrap_or_default()
             )
@@ -372,21 +373,23 @@ mod tests {
     }
 
     #[test]
-    fn only_refused_picture_uploads_are_reported() {
-        let got = picture_refusals(json!([
+    fn only_this_apps_refused_commands_are_reported() {
+        let got = refusals(json!([
             {"command_id": "uas-picture-upload-ab12", "status": "rejected",
              "reason_code": "unknown_picture", "reason": "no picture marker with this message_id"},
             {"command_id": "uas-picture-upload-cd34", "status": "result", "result": {"status": "stored"}},
             {"command_id": "uas-marker-create-ef56", "status": "rejected", "reason_code": "unauthorized"},
+            {"command_id": "rem-marker-create-1", "status": "rejected", "reason_code": "unauthorized"},
         ]));
         assert_eq!(
             got,
             [
-                "photo upload refused by the hub: unknown_picture no picture marker with this message_id"
+                "hub refused uas-picture-upload-ab12: unknown_picture no picture marker with this message_id",
+                "hub refused uas-marker-create-ef56: unauthorized",
             ]
         );
         assert!(
-            picture_refusals(json!({"command_id": "uas-picture-upload-1", "status": "accepted"}))
+            refusals(json!({"command_id": "uas-picture-upload-1", "status": "accepted"}))
                 .is_empty()
         );
     }

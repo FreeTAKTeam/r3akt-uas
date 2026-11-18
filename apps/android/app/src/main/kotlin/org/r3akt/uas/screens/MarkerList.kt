@@ -13,7 +13,7 @@ import org.r3akt.uas.hud.Hud
 
 /**
  * The app's own operator markers with MOVE HERE, DELETE and RESEND LAST FIX: one list for the
- * LOG's MARKERS panel and the OBSERVATIONS page. Every [MarkerOps] call runs on its worker.
+ * MESH's MARKERS panel and the OBSERVATIONS page. Every [MarkerOps] call runs on its worker.
  * It shows the last change made here and how many are still stored; never the hub's state.
  */
 class MarkerList(private val activity: Activity, private val ops: MarkerOps) {
@@ -40,7 +40,7 @@ class MarkerList(private val activity: Activity, private val ops: MarkerOps) {
 
     private fun show(markers: List<MarkerOps.Marker>, pending: String, publishing: Boolean) {
         // Stored is not sent: the outbox may still hold the latest change (UAS-PRD-010).
-        header.text = (if (publishing) "" else "Publishing is off: open LOG, tap START PUBLISH.\n") +
+        header.text = (if (publishing) "" else "Publishing is off: open MESH, tap START PUBLISH.\n") +
             "This app's markers (last change made here)\n$pending change(s) stored, waiting for the hub"
         rows.removeAllViews()
         if (markers.isEmpty()) rows.addView(TextView(activity).apply { text = "none"; setTextColor(Hud.DIM) })

@@ -342,8 +342,10 @@ class AimMarkerPanel(
 
     private fun px(v: Float) = (v * s).toInt()
 
-    // Alpha-1, Alpha-2, ...: the FreeTAKUAS counter. Runs on the worker (it reads the store).
-    private fun nextName(base: String) = "$base-${markerList().count { it.name.startsWith("$base-") } + 1}"
+    // Alpha-1, Alpha-2, ...: the FreeTAKUAS counter, one above the highest so a delete never repeats a name.
+    // Runs on the worker (it reads the store).
+    private fun nextName(base: String) =
+        "$base-${(markerList().mapNotNull { it.name.removePrefix("$base-").toIntOrNull() }.maxOrNull() ?: 0) + 1}"
 
     private fun color(a: Affiliation) = when (a) {
         Affiliation.FRIENDLY -> 0xFF4FA8FF.toInt()
