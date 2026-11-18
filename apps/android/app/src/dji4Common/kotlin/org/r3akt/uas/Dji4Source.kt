@@ -46,7 +46,19 @@ object Dji4Source : AircraftSource {
         override fun close() = Dji4Sdk.closeMedia()
     }
 
-    override fun videoView(context: Context): View = Dji4VideoView(context)
+    private var video: Dji4VideoView? = null
+
+    override fun videoView(context: Context): View = Dji4VideoView(context).also { video = it }
+
+    // The original goes to the aircraft's card; the crops come from the live frame, because reading
+    // the card needs media-download mode, which stops the live view in flight (issue #19: video keeps priority).
+    // shortcut: the frame is the preview's resolution (often below 1600 × 1200); read the card's photo after landing if more is needed.
+    override fun capturePicture(onDone: (android.graphics.Bitmap?, String?) -> Unit) {
+        val frame = video?.takeIf { it.isAvailable }?.bitmap ?: return onDone(null, "No live video frame")
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        if (Dji4Sdk.state().cameraMode != Dji4CameraMode.PHOTO) return onDone(frame, "Camera not in photo mode: no photo on the card")
+        Dji4Sdk.perform(Dji4Action.PHOTO) { error -> main.post { onDone(frame, error?.let { "No photo on the card: $it" }) } }
+    }
 
     override fun perform(action: FlightAction, onResult: (String?) -> Unit) = when (action) {
         FlightAction.STREAM_START -> streamUrl()?.let { url ->

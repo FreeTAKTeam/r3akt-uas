@@ -56,6 +56,19 @@ open class SimulatorSource(private val networkReport: String = "Network publicat
     )
 
     override fun configItems() = listOf("DJI SDK key" to "not in this build (simulator)")
+
+    // A generated 4:3 frame, always marked SIMULATED (simulator output is always marked).
+    override fun capturePicture(onDone: (android.graphics.Bitmap?, String?) -> Unit) {
+        val bmp = android.graphics.Bitmap.createBitmap(1600, 1200, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        c.drawColor(0xFF2E4A36.toInt())
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); strokeWidth = 12f; textSize = 220f; textAlign = android.graphics.Paint.Align.CENTER }
+        c.drawLine(700f, 600f, 900f, 600f, p)
+        c.drawLine(800f, 500f, 800f, 700f, p)
+        c.drawText("SIMULATED", 800f, 420f, p)
+        c.drawText(java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date()), 800f, 950f, p)
+        onDone(bmp, null)
+    }
     // Simulated contacts (UAS-RAD-009) at fixed coordinates around the orbit centre (45.0, 7.0):
     // a spiral in degrees from about 130 m to 6.4 km, so 13 lie beyond 5 km and 62 exceed the
     // 50-contact limit, plus two placed about 10 m from others to need the overlap chooser.

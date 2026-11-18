@@ -223,6 +223,7 @@ fn record_of(marker: &OwnMarker) -> MarkerRecord {
         notes: None,
         created_ts_ms: marker.updated_ms,
         updated_ts_ms: marker.updated_ms,
+        picture: None,
     }
 }
 

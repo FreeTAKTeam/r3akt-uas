@@ -126,6 +126,11 @@ enum Cmd {
         record: Box<MarkerRecord>,
         reply: std::sync::mpsc::Sender<Result<(), String>>,
     },
+    Picture {
+        record: Box<MarkerRecord>,
+        capture: Box<markers::PictureCapture>,
+        reply: std::sync::mpsc::Sender<Result<(), String>>,
+    },
     ResendLast,
     Announce,
     Stop,
@@ -300,19 +305,34 @@ pub(crate) fn store_dir() -> Option<std::path::PathBuf> {
 
 /// Hands one marker change to the worker and waits until the custody outbox holds it.
 pub(crate) fn submit_marker(change: Change, record: MarkerRecord) -> Result<(), String> {
+    submit(|reply| Cmd::Marker {
+        change,
+        record: Box::new(record),
+        reply,
+    })
+}
+
+/// Hands a picture marker and its images to the worker; waits until the outbox holds both messages.
+pub(crate) fn submit_picture(
+    record: MarkerRecord,
+    capture: markers::PictureCapture,
+) -> Result<(), String> {
+    submit(|reply| Cmd::Picture {
+        record: Box::new(record),
+        capture: Box::new(capture),
+        reply,
+    })
+}
+
+fn submit(
+    cmd: impl FnOnce(std::sync::mpsc::Sender<Result<(), String>>) -> Cmd,
+) -> Result<(), String> {
     let (reply, result) = std::sync::mpsc::channel();
     let sent = WORKER
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .as_ref()
-        .is_some_and(|w| {
-            w.tx.send(Cmd::Marker {
-                change,
-                record: Box::new(record),
-                reply,
-            })
-            .is_ok()
-        });
+        .is_some_and(|w| w.tx.send(cmd(reply)).is_ok());
     if !sent {
         return Err("start publishing first".to_owned());
     }
@@ -540,6 +560,23 @@ fn run(
                     update_pending(&outbox);
                     let _ = reply.send(result);
                 }
+                Ok(Cmd::Picture {
+                    record,
+                    capture,
+                    reply,
+                }) => {
+                    let result = deposit_picture(
+                        &runtime,
+                        &outbox,
+                        &source_hex,
+                        hub,
+                        team,
+                        &record,
+                        &capture,
+                    );
+                    update_pending(&outbox);
+                    let _ = reply.send(result);
+                }
                 Ok(Cmd::Stop) | Err(RecvTimeoutError::Disconnected) => return Ok(()),
                 Err(RecvTimeoutError::Timeout) => break,
             }
@@ -630,9 +667,7 @@ fn deposit_marker(
     record: &MarkerRecord,
 ) -> Result<(), String> {
     let fields = markers::message(change, record, source, team, now_s().saturating_mul(1000))?;
-    let prepared = runtime
-        .block_on(outbox.prepare(&fields_request(source, hub, &fields)))
-        .map_err(|e| format!("{e} (the hub must have been reached once)"))?;
+    let prepared = prepare(runtime, outbox, source, hub, &fields)?;
     let kind = match change {
         Change::Create => MessageKind::Application,
         Change::Move | Change::Delete => MessageKind::Telemetry {
@@ -643,6 +678,44 @@ fn deposit_marker(
         .deposit_own(prepared, kind, now_s(), None)
         .map(|_| ())
         .map_err(|e| e.to_string())
+}
+
+fn prepare(
+    runtime: &tokio::runtime::Runtime,
+    outbox: &LocalPropagation,
+    source: &str,
+    hub: &str,
+    fields: &[u8],
+) -> Result<lxmf_runtime::PreparedOutgoing, String> {
+    runtime
+        .block_on(outbox.prepare(&fields_request(source, hub, fields)))
+        .map_err(|e| format!("{e} (the hub must have been reached once)"))
+}
+
+/// Deposits a picture marker (message 1), then the reduced-image upload (message 2) naming
+/// message 1's LXMF message ID, the picture ID. The outbox sends oldest first, so the thumbnail
+/// never waits behind the larger upload.
+fn deposit_picture(
+    runtime: &tokio::runtime::Runtime,
+    outbox: &LocalPropagation,
+    source: &str,
+    hub: &str,
+    team: Option<&str>,
+    record: &MarkerRecord,
+    capture: &markers::PictureCapture,
+) -> Result<(), String> {
+    let now = now_s().saturating_mul(1000);
+    let marker = markers::picture_message(record, &capture.thumbnail, source, team, now)?;
+    let marker = prepare(runtime, outbox, source, hub, &marker)?;
+    let message_id = marker.message_id().map_err(|e| e.to_string())?;
+    let upload = markers::upload_message(record, &message_id, capture, source, now)?;
+    let upload = prepare(runtime, outbox, source, hub, &upload)?;
+    for prepared in [marker, upload] {
+        outbox
+            .deposit_own(prepared, MessageKind::Application, now_s(), None)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 /// Recovers the oldest undelivered change, as a Resource so its completion records delivery
