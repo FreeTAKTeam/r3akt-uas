@@ -16,6 +16,8 @@ import android.widget.TextView
 import android.widget.Toast
 import org.r3akt.uas.bridge.Affiliation
 import org.r3akt.uas.bridge.CameraPose
+import org.r3akt.uas.bridge.PictureCapture
+import org.r3akt.uas.bridge.markerCreatePicture
 import org.r3akt.uas.bridge.markerCreate
 import org.r3akt.uas.bridge.markerCreateAtCamera
 import org.r3akt.uas.bridge.markerCreateAtOffset
@@ -25,6 +27,7 @@ import org.r3akt.uas.hud.HudButton
 import org.r3akt.uas.hud.HudView
 import org.r3akt.uas.screens.RadarLogic
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * Names and places an operator marker after a tap on the aim cross (owner direction, 11 November 2026):
@@ -33,6 +36,8 @@ import java.util.concurrent.Executor
  * pressed; without one it goes at the aircraft position (D-15 (a)) and the panel says so.
  * Names follow the FreeTAKUAS Alpha–Zulu counter (D-11). Bridge calls run on [worker].
  * With [offset] (range m, true bearing) from a radar pick (D-10 (b)) the marker goes there instead.
+ * PICTURE (UAS-OBS-005, issue #19), offered at the aim cross only, takes a picture at once and places a
+ * picture marker at the camera point once its thumbnail and reduced image are cropped, off the UI thread.
  */
 class AimMarkerPanel(
     private val activity: Activity,
@@ -53,7 +58,10 @@ class AimMarkerPanel(
     private val affFold = LinearLayout(activity)
     private val chips = LinearLayout(activity)
     private val segments = mutableMapOf<Affiliation, TextView>()
+    private var pictureSeg: TextView? = null
+    private val pictureOffered = cameraPose != null && offset == null
     private val problem = text("", 12f, Hud.AMBER, label)
+    private var picture = false
     private val place = HudButton(activity, { s }, label, null, "PLACE MARKER").apply { tone = HudButton.Tone.GO }
 
     fun show() {
@@ -116,6 +124,15 @@ class AimMarkerPanel(
                 segments[a] = seg
                 addView(seg, LinearLayout.LayoutParams(0, px(34f), 1f).apply { marginEnd = pad / 3; topMargin = pad / 2 })
             }
+            if (pictureOffered) {
+                val seg = text("PICTURE", 12f, Hud.DIM, label).apply {
+                    gravity = Gravity.CENTER
+                    contentDescription = "Picture marker: takes a picture at the aim cross"
+                    setOnClickListener { setPicture(); fold() }
+                }
+                pictureSeg = seg
+                addView(seg, LinearLayout.LayoutParams(0, px(34f), 1.3f).apply { topMargin = pad / 2 })
+            }
         }
         root.addView(affFold)
 
@@ -125,7 +142,7 @@ class AimMarkerPanel(
         place.setOnClickListener { placeMarker() }
         root.addView(place, LinearLayout.LayoutParams(MATCH, px(48f)))
 
-        setAffiliation(lastAffiliation)
+        if (lastPicture && pictureOffered) setPicture() else setAffiliation(lastAffiliation)
         setName("")
         worker.execute {
             val next = nextName(lastBase)
@@ -144,6 +161,7 @@ class AimMarkerPanel(
             return
         }
         setName(name)
+        if (picture) return placePicture(name)
         val affiliation = lastAffiliation
         problem.text = ""
         place.isEnabled = false
@@ -167,6 +185,41 @@ class AimMarkerPanel(
         }
     }
 
+    // Capture at once (the operator's feedback is immediate); crop on a low-priority thread, one job
+    // at a time; the marker message is built only when both images exist (no partial message).
+    private fun placePicture(name: String) {
+        if (pictureBusy) { problem.text = "PREVIOUS PICTURE STILL PROCESSING"; return }
+        val pose = cameraPose?.invoke() ?: run { problem.text = "NOT PLACED: no aircraft position, heading or gimbal angle"; return }
+        problem.text = ""
+        place.isEnabled = false
+        Variant.source.capturePicture { frame, note ->
+            place.isEnabled = true
+            if (frame == null) { problem.text = "NO PICTURE: ${note ?: "not taken"}"; return@capturePicture }
+            val takenMs = System.currentTimeMillis()
+            val app = activity.applicationContext
+            pictureBusy = true
+            close()
+            Toast.makeText(app, "$name: picture taken, processing" + (note?.let { " · $it" } ?: ""), Toast.LENGTH_LONG).show()
+            imaging.execute {
+                val capture = runCatching {
+                    val c = PictureImage.centre43(frame.width, frame.height)
+                    val (w, h) = PictureImage.fit(c[2], c[3], PictureImage.REDUCED_W, PictureImage.REDUCED_H)
+                    PictureCapture(PictureImage.thumbnail(frame), PictureImage.reduced(frame), w.toUInt(), h.toUInt(), takenMs)
+                }.also { frame.recycle() }
+                worker.execute {
+                    val result = capture.mapCatching { markerCreatePicture(name, pose, it).name }
+                    pictureBusy = false
+                    activity.runOnUiThread {
+                        Toast.makeText(app, result.fold(
+                            { "$it placed with its picture (stored for the hub)" },
+                            { "$name NOT PLACED: ${it.message?.removePrefix("reason=") ?: it}" },
+                        ), Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+
     private fun close() {
         keyboard(false)
         (root.parent as? ViewGroup)?.removeView(root)
@@ -178,11 +231,24 @@ class AimMarkerPanel(
         if (nameField.text.toString() != name) nameField.setText(name)
         nameValue.text = name.ifEmpty { "—" }
         names.firstOrNull { name.startsWith("$it-") }?.let { lastBase = it }
-        hud.aimMarker = name.ifEmpty { "—" } to color(lastAffiliation)
+        hud.aimMarker = name.ifEmpty { "—" } to if (picture) Hud.WHITE else color(lastAffiliation)
         showChips()
     }
 
+    private fun setPicture() {
+        picture = true
+        lastPicture = true
+        affValue.text = "PICTURE"
+        affDot.background = GradientDrawable().apply { setColor(Hud.WHITE) }
+        for ((k, seg) in segments) { seg.background = frame(Hud.GREEN_LINE, 0); seg.setTextColor(Hud.WHITE) }
+        pictureSeg?.apply { background = frame(Hud.WHITE, Hud.WHITE); setTextColor(Hud.INK_GO) }
+        hud.aimMarker = nameValue.text.toString() to Hud.WHITE
+    }
+
     private fun setAffiliation(a: Affiliation) {
+        picture = false
+        lastPicture = false
+        pictureSeg?.apply { background = frame(Hud.GREEN_LINE, 0); setTextColor(Hud.WHITE) }
         lastAffiliation = a
         affValue.text = a.name
         affDot.background = GradientDrawable().apply { setColor(color(a)) }
@@ -285,5 +351,9 @@ class AimMarkerPanel(
         var lastAffiliation = Affiliation.HOSTILE
         var lastBase = "Alpha"
         var current: AimMarkerPanel? = null
+        var lastPicture = false
+        @Volatile var pictureBusy = false
+        // Cropping yields to flight control and video (issue #19).
+        val imaging: Executor = Executors.newSingleThreadExecutor { Thread(it, "picture-crop").apply { priority = Thread.MIN_PRIORITY } }
     }
 }

@@ -7,8 +7,9 @@
 
 use std::path::Path;
 
+use r3akt_map_core::marker_picture::{self as picture, MarkerPicture, PictureCamera, PictureCrop};
 use r3akt_map_core::{MarkerDraft, MarkerRecord, Position, marker};
-use r3akt_profile_rch::{MissionCommandEnvelope, RchSource, encode_commands_for_team};
+use r3akt_profile_rch::{MissionCommandEnvelope, RchSource, encode_commands_for_team_with_image};
 use rand_core::{OsRng, RngCore};
 
 /// NATO affiliation; each is a map-core catalog symbol (D-11).
@@ -75,11 +76,23 @@ pub(crate) fn new_record(
     simulated: bool,
     now_ms: i64,
 ) -> Result<MarkerRecord, String> {
-    let symbol = marker::marker_symbol(affiliation.symbol()).map_err(|e| e.to_string())?;
+    record_of(affiliation.symbol(), name, lat, lon, simulated, now_ms)
+}
+
+/// A new marker of map-core catalog `kind` (an affiliation or `picture`).
+fn record_of(
+    kind: &str,
+    name: &str,
+    lat: f64,
+    lon: f64,
+    simulated: bool,
+    now_ms: i64,
+) -> Result<MarkerRecord, String> {
+    let symbol = marker::marker_symbol(kind).map_err(|e| e.to_string())?;
     let mut id = [0u8; 16];
     OsRng.fill_bytes(&mut id);
     let draft = MarkerDraft {
-        marker_type: marker::marker_type(affiliation.symbol()).map_err(|e| e.to_string())?,
+        marker_type: marker::marker_type(kind).map_err(|e| e.to_string())?,
         category: symbol.clone(),
         symbol,
         name: marker::normalize_name(name).ok_or("marker name is empty")?,
@@ -112,6 +125,65 @@ pub(crate) fn message(
     team: Option<&str>,
     now_ms: i64,
 ) -> Result<Vec<u8>, String> {
+    encode(envelope(change, record, source, now_ms), team, None)
+}
+
+/// A picture marker's create with its thumbnail in LXMF field 6 (UAS-OBS-005, `picture-marker.md`
+/// message 1); RCH relays both to the team.
+pub(crate) fn picture_message(
+    record: &MarkerRecord,
+    thumbnail: &[u8],
+    source: &str,
+    team: Option<&str>,
+    now_ms: i64,
+) -> Result<Vec<u8>, String> {
+    encode(
+        envelope(Change::Create, record, source, now_ms),
+        team,
+        Some(thumbnail),
+    )
+}
+
+/// The reduced image for the hub only (message 2): no team field, so RCH relays it to nobody.
+/// `message_id` is the picture marker message's LXMF message ID, the picture ID.
+pub(crate) fn upload_message(
+    record: &MarkerRecord,
+    message_id: &str,
+    capture: &PictureCapture,
+    source: &str,
+    now_ms: i64,
+) -> Result<Vec<u8>, String> {
+    let command = MissionCommandEnvelope {
+        command_id: format!("uas-picture-upload-{message_id}"),
+        source: RchSource::new(source),
+        timestamp: r3akt_map_core::time::iso8601_from_unix_ms(now_ms),
+        command_type: picture::UPLOAD_COMMAND.to_owned(),
+        args: serde_json::json!({
+            "object_destination_hash": record.object_destination_hash, "message_id": message_id,
+            "media_type": "image/jpeg", "width": capture.reduced_width,
+            "height": capture.reduced_height, "sha256": picture::sha256_hex(&capture.reduced),
+        }),
+        correlation_id: None,
+        topics: Vec::new(),
+    };
+    encode(command, None, Some(&capture.reduced))
+}
+
+fn encode(
+    command: MissionCommandEnvelope,
+    team: Option<&str>,
+    jpeg: Option<&[u8]>,
+) -> Result<Vec<u8>, String> {
+    encode_commands_for_team_with_image(&[command], team, jpeg.map(|b| ("jpg", b)))
+        .map_err(|e| e.to_string())
+}
+
+fn envelope(
+    change: Change,
+    record: &MarkerRecord,
+    source: &str,
+    now_ms: i64,
+) -> MissionCommandEnvelope {
     let id = &record.object_destination_hash;
     let (command_type, command_id, args) = match change {
         Change::Create => (
@@ -134,19 +206,19 @@ pub(crate) fn message(
             serde_json::json!({"object_destination_hash": id}),
         ),
     };
-    encode_commands_for_team(
-        &[MissionCommandEnvelope {
-            command_id,
-            source: RchSource::new(source),
-            timestamp: r3akt_map_core::time::iso8601_from_unix_ms(now_ms),
-            command_type: command_type.to_owned(),
-            args,
-            correlation_id: None,
-            topics: Vec::new(),
-        }],
-        team,
-    )
-    .map_err(|e| e.to_string())
+    let mut args = args;
+    if let (Change::Create, Some(p)) = (change, &record.picture) {
+        args["picture"] = serde_json::to_value(p).unwrap_or_default();
+    }
+    MissionCommandEnvelope {
+        command_id,
+        source: RchSource::new(source),
+        timestamp: r3akt_map_core::time::iso8601_from_unix_ms(now_ms),
+        command_type: command_type.to_owned(),
+        args,
+        correlation_id: None,
+        topics: Vec::new(),
+    }
 }
 
 /// The custody-outbox replacement key: a newer move or a delete supersedes a pending move.
@@ -156,7 +228,7 @@ pub(crate) fn replacement_key(record: &MarkerRecord) -> String {
 
 // ---- UniFFI exports --------------------------------------------------------
 
-use crate::publish::{PublishError, last_fix, store_dir, submit_marker};
+use crate::publish::{PublishError, last_fix, store_dir, submit_marker, submit_picture};
 
 fn refused(reason: impl Into<String>) -> PublishError {
     PublishError::Marker {
@@ -226,6 +298,101 @@ pub fn marker_create_at_camera(
     .map_err(refused)?;
     record.notes = Some(camera_note(fix.simulated, &point));
     submit_marker(Change::Create, record.clone()).map_err(refused)?;
+    save(&dir, &record).map_err(refused)?;
+    Ok(OwnMarker::from(&record))
+}
+
+/// The two transmitted images of a picture marker, JPEG bytes cropped by the app (UAS-OBS-005).
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct PictureCapture {
+    /// 160 × 120, sent with the marker.
+    pub thumbnail: Vec<u8>,
+    /// At most 1600 × 1200, uploaded to the hub only.
+    pub reduced: Vec<u8>,
+    pub reduced_width: u32,
+    pub reduced_height: u32,
+    /// When the picture was taken, epoch milliseconds.
+    pub captured_ms: i64,
+}
+
+/// Thumbnail size fixed by issue #19.
+const THUMB_W: u32 = 160;
+const THUMB_H: u32 = 120;
+
+/// A `picture` marker at the camera point, with what is known of the camera at capture.
+/// Heading and gimbal yaw are not sent: the pose carries only their sum (never guessed).
+pub(crate) fn picture_record(
+    name: &str,
+    fix: &crate::telemetry::TelemetrySample,
+    pose: &crate::camera::CameraPose,
+    point: &r3akt_map_core::camera_ground::GroundPoint,
+    capture: &PictureCapture,
+    now_ms: i64,
+) -> Result<MarkerRecord, String> {
+    use crate::telemetry::AltitudeReference as A;
+    let mut record = record_of(
+        picture::MARKER_TYPE,
+        name,
+        point.position.lat(),
+        point.position.lon(),
+        fix.simulated,
+        now_ms,
+    )?;
+    record.notes = Some(camera_note(fix.simulated, point));
+    let reference = match fix.altitude_reference {
+        A::Msl => Some("msl"),
+        A::Hae => Some("hae"),
+        A::Agl => Some("agl"),
+        A::TakeoffRelative => Some("takeoff"),
+        A::Unknown => None,
+    };
+    record.picture = Some(MarkerPicture {
+        message_id: None,
+        thumbnail: picture::PictureImage {
+            media_type: "image/jpeg".to_owned(),
+            width: THUMB_W,
+            height: THUMB_H,
+            sha256: picture::sha256_hex(&capture.thumbnail),
+        },
+        captured_at: Some(r3akt_map_core::time::iso8601_from_unix_ms(
+            capture.captured_ms,
+        )),
+        camera: Some(PictureCamera {
+            lat: Some(fix.latitude_deg),
+            lon: Some(fix.longitude_deg),
+            altitude_m: reference.map(|_| fix.altitude_m),
+            altitude_reference: reference.map(str::to_owned),
+            heading_deg: None,
+            gimbal_pitch_deg: Some(pose.elevation_deg),
+            gimbal_yaw_deg: None,
+        }),
+        crop: Some(PictureCrop::Centre),
+    });
+    Ok(record)
+}
+
+/// Places a picture marker where the camera centre meets the ground (UAS-OBS-005): one marker
+/// message with the thumbnail, then the reduced-image upload, both held by the custody outbox,
+/// so a capture is not lost while the hub is unreachable. Refused, never estimated, without a
+/// valid camera point.
+///
+/// # Errors
+/// As [`marker_create_at_camera`], or an empty image.
+#[uniffi::export]
+pub fn marker_create_picture(
+    name: &str,
+    pose: crate::camera::CameraPose,
+    capture: PictureCapture,
+) -> Result<OwnMarker, PublishError> {
+    if capture.thumbnail.is_empty() || capture.reduced.is_empty() {
+        return Err(refused("empty picture"));
+    }
+    let (dir, fix) = placement()?;
+    let now = now_ms();
+    let point = crate::camera::camera_point(&fix, &pose, u64::try_from(now).unwrap_or(0))
+        .map_err(|e| refused(format!("no camera point: {e}")))?;
+    let record = picture_record(name, &fix, &pose, &point, &capture, now).map_err(refused)?;
+    submit_picture(record.clone(), capture).map_err(refused)?;
     save(&dir, &record).map_err(refused)?;
     Ok(OwnMarker::from(&record))
 }
@@ -433,6 +600,79 @@ mod tests {
                 .unwrap();
         assert_eq!(keys.as_object().unwrap().keys().collect::<Vec<_>>(), ["9"]);
         assert_eq!(a[0].command_id, b[0].command_id);
+    }
+
+    #[test]
+    fn picture_marker_and_upload_decode_with_the_shared_decoder() {
+        let fix = crate::sim::sample(10);
+        let pose = crate::sim::camera(10);
+        let point =
+            crate::camera::camera_point(&fix, &pose, (crate::sim::START_TIME_S + 10) * 1000)
+                .unwrap();
+        let capture = PictureCapture {
+            thumbnail: vec![0xFF, 0xD8, 1, 2],
+            reduced: vec![0xFF, 0xD8, 3, 4, 5],
+            reduced_width: 1440,
+            reduced_height: 1080,
+            captured_ms: 1_800_000_000_000,
+        };
+        let rec = picture_record("Alpha-1", &fix, &pose, &point, &capture, 1).unwrap();
+        assert_eq!(
+            (rec.marker_type.as_str(), rec.symbol.as_str()),
+            ("picture", "picture")
+        );
+        let team = Some("43341e5c822d99857fa6e8641f2ca9c0");
+
+        // Message 1: the create with picture metadata, team field 11 and the thumbnail in field 6.
+        let bytes = picture_message(&rec, &capture.thumbnail, "s", team, 1).unwrap();
+        let fields = r3akt_map_core::msgpack::to_json(&bytes).unwrap();
+        assert_eq!(fields.get("11").and_then(|t| t.as_str()), team);
+        assert_eq!(
+            picture::image_field(&fields["6"]),
+            Some(("jpg".to_owned(), capture.thumbnail.clone()))
+        );
+        let create = &decode_commands(&bytes).unwrap()[0];
+        assert_eq!(create.command_type, "mission.marker.create");
+        let meta = MarkerPicture::parse(&create.args["picture"]).unwrap();
+        assert_eq!(
+            meta.thumbnail.sha256,
+            picture::sha256_hex(&capture.thumbnail)
+        );
+        assert_eq!((meta.thumbnail.width, meta.thumbnail.height), (160, 120));
+        let camera = meta.camera.unwrap();
+        // The simulated orbit has no heading, and the pose cannot split heading from gimbal yaw.
+        assert_eq!((camera.heading_deg, camera.gimbal_yaw_deg), (None, None));
+
+        // Message 2: hub only (no field 11), naming the picture ID, reduced image in field 6.
+        let id = "ab".repeat(32);
+        let bytes = upload_message(&rec, &id, &capture, "s", 1).unwrap();
+        let fields = r3akt_map_core::msgpack::to_json(&bytes).unwrap();
+        assert!(fields.get("11").is_none());
+        assert_eq!(
+            picture::image_field(&fields["6"]).unwrap().1,
+            capture.reduced
+        );
+        let upload = &decode_commands(&bytes).unwrap()[0];
+        assert_eq!(upload.command_type, picture::UPLOAD_COMMAND);
+        assert_eq!(upload.args["message_id"], id);
+        assert_eq!(upload.args["width"], 1440);
+        assert_eq!(upload.args["sha256"], picture::sha256_hex(&capture.reduced));
+
+        // Ordinary markers carry no picture and no field 6.
+        let plain = new_record("Bravo-1", Affiliation::Hostile, 45.0, 7.0, true, 1).unwrap();
+        let bytes = message(Change::Create, &plain, "s", team, 1).unwrap();
+        assert!(
+            r3akt_map_core::msgpack::to_json(&bytes)
+                .unwrap()
+                .get("6")
+                .is_none()
+        );
+        assert!(
+            decode_commands(&bytes).unwrap()[0]
+                .args
+                .get("picture")
+                .is_none()
+        );
     }
 
     #[test]
