@@ -13,7 +13,7 @@ import java.util.concurrent.Executor
 
 /**
  * The app's own operator markers (test build) through the native bridge; the same operations
- * back the LOG's MARKERS panel and the OBSERVATIONS page. New markers are placed from the aim
+ * back the MESH dialog's MARKERS panel and the OBSERVATIONS page. New markers are placed from the aim
  * cross ([AimMarkerPanel]). Every bridge call runs on [worker]: it may wait for the publisher.
  */
 class BridgeMarkerOps(override val worker: Executor, private val isPublishing: () -> Boolean) : MarkerOps {

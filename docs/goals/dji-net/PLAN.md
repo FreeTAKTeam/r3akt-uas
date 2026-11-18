@@ -66,6 +66,14 @@ Rulings: D-14 Mavic Air 2 or Air 2S with the RC-N1, key supplied by the owner; D
 
 D-19 (owner, 10 November 2026): the app announces itself like a REM app. Its LXMF delivery announce carries a display name and REM's capabilities `r3akt`, `emergencymessages` and `telemetry`, encoded by LXMF-rs (`lxmf-wire`). RCH then lists it as a REM peer that an operator can add to a team. Known effect: the hub may send it REM traffic, such as Emergency Action Messages, that it does not read (G-17).
 
+D-15 (b) (owner, 15 November 2026, after the first flights): a marker must be placed where the camera aims, not at the aircraft position. FreeTAKUAS's idea (aircraft altitude and gimbal pitch) is kept, its algorithm is not: the point comes from the shared `ground_point` (RCH #313). Inputs:
+- **Azimuth:** aircraft heading plus the gimbal yaw relative to it.
+- **Elevation:** the gimbal pitch.
+- **Ground:** the take-off level; the app has no terrain data.
+- **Bounds:** DJI's published Mavic Air 2 hovering accuracy (horizontal ±1.5 m, vertical ±0.5 m), and our estimates where DJI publishes nothing: azimuth 5°, elevation 1°, target ground ±5 m from take-off height. All are in `dji.rs`.
+
+The bound only feeds the aim point; the published fix keeps its accuracy unknown. Each marker's notes carry the resulting bound and the ground assumption.
+
 | ID | Decision | Proposal (ruled as above) |
 |---|---|---|
 | D-14 | Aircraft and key | The owner names the aircraft and remote controller. They must be DJI Mobile SDK 4 products (for example the Mavic 2 or Phantom 4 series, or the Mavic Air 2). The owner also provides an app key for `org.r3akt.uas` in `~/.gradle/gradle.properties`. |

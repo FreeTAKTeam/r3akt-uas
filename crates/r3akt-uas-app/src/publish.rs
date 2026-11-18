@@ -5,9 +5,10 @@
 //! module only maps a [`TelemetrySample`] onto the shared `OriginPosition`.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{RecvTimeoutError, TryRecvError};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::camera::origin_position;
 use base64::Engine as _;
@@ -104,6 +105,8 @@ pub struct PublishStatus {
     pub team_uid: Option<String>,
     /// Marker changes held by the custody outbox and not yet delivered to the hub.
     pub markers_pending: u32,
+    /// When the app last announced itself, epoch seconds; peers need it to reach the app.
+    pub last_announce_s: Option<i64>,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq, uniffi::Error)]
@@ -123,7 +126,13 @@ enum Cmd {
         record: Box<MarkerRecord>,
         reply: std::sync::mpsc::Sender<Result<(), String>>,
     },
+    Picture {
+        record: Box<MarkerRecord>,
+        capture: Box<markers::PictureCapture>,
+        reply: std::sync::mpsc::Sender<Result<(), String>>,
+    },
     ResendLast,
+    Announce,
     Stop,
 }
 
@@ -235,6 +244,7 @@ const STATUS_STOPPED: PublishStatus = PublishStatus {
     last_error: None,
     team_uid: None,
     markers_pending: 0,
+    last_announce_s: None,
 };
 
 /// Lower-cases a 32-hex hash; RCH matches hashes and team UIDs in lower case.
@@ -286,6 +296,11 @@ pub(crate) fn last_fix() -> Option<TelemetrySample> {
         .clone()
 }
 
+/// Shows an error on the MESH status, for what the receiver learns from the hub.
+pub(crate) fn report_error(error: String) {
+    update(|s| s.last_error = Some(error));
+}
+
 pub(crate) fn store_dir() -> Option<std::path::PathBuf> {
     STORE_DIR
         .lock()
@@ -293,27 +308,72 @@ pub(crate) fn store_dir() -> Option<std::path::PathBuf> {
         .clone()
 }
 
+/// The worker did not answer in time: it may still deposit the change.
+pub(crate) const NO_ANSWER: &str = "publisher did not answer";
+
 /// Hands one marker change to the worker and waits until the custody outbox holds it.
 pub(crate) fn submit_marker(change: Change, record: MarkerRecord) -> Result<(), String> {
+    submit(|reply| Cmd::Marker {
+        change,
+        record: Box::new(record),
+        reply,
+    })
+}
+
+/// Hands a picture marker and its images to the worker; waits until the outbox holds both messages.
+pub(crate) fn submit_picture(
+    record: MarkerRecord,
+    capture: markers::PictureCapture,
+) -> Result<(), String> {
+    submit(|reply| Cmd::Picture {
+        record: Box::new(record),
+        capture: Box::new(capture),
+        reply,
+    })
+}
+
+fn submit(
+    cmd: impl FnOnce(std::sync::mpsc::Sender<Result<(), String>>) -> Cmd,
+) -> Result<(), String> {
     let (reply, result) = std::sync::mpsc::channel();
     let sent = WORKER
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .as_ref()
-        .is_some_and(|w| {
-            w.tx.send(Cmd::Marker {
-                change,
-                record: Box::new(record),
-                reply,
-            })
-            .is_ok()
-        });
+        .is_some_and(|w| w.tx.send(cmd(reply)).is_ok());
     if !sent {
         return Err("start publishing first".to_owned());
     }
     result
         .recv_timeout(MARKER_REPLY_TIMEOUT)
-        .map_err(|_| "publisher did not answer".to_owned())?
+        .map_err(|_| NO_ANSWER.to_owned())?
+}
+
+/// Seconds between announces while connected (owner, 15 November 2026: default 1800).
+pub const DEFAULT_ANNOUNCE_INTERVAL_S: u64 = 1800;
+/// Shortest interval accepted, so announces never flood a constrained link.
+pub const MIN_ANNOUNCE_INTERVAL_S: u64 = 60;
+static ANNOUNCE_INTERVAL_S: AtomicU64 = AtomicU64::new(DEFAULT_ANNOUNCE_INTERVAL_S);
+
+/// Sets the announce interval; the running worker uses it from its next pass.
+///
+/// # Errors
+/// [`PublishError::Config`] below [`MIN_ANNOUNCE_INTERVAL_S`].
+#[uniffi::export]
+pub fn publish_set_announce_interval(seconds: u64) -> Result<(), PublishError> {
+    if seconds < MIN_ANNOUNCE_INTERVAL_S {
+        return Err(PublishError::Config {
+            reason: format!("announce interval must be at least {MIN_ANNOUNCE_INTERVAL_S} s"),
+        });
+    }
+    ANNOUNCE_INTERVAL_S.store(seconds, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Announces the app now (or as soon as the hub link is up), so peers can reach it.
+#[uniffi::export]
+pub fn publish_announce() {
+    send_cmd(Cmd::Announce);
 }
 
 /// Re-sends the exact bytes of the last sent fix (replay check).
@@ -363,7 +423,7 @@ type Net = (
 
 /// REM's announce capabilities (owner ruling D-19): RCH lists a peer as a REM client, which an
 /// operator can add to a team, only with `r3akt` and `emergencymessages`. The app handles no
-/// Emergency Action Messages and reads nothing the hub sends it (G-17).
+/// Emergency Action Messages; of what it receives it keeps only team markers (UAS-PRD-013).
 const ANNOUNCE_CAPABILITIES: [&str; 3] = ["r3akt", "emergencymessages", "telemetry"];
 
 /// The LXMF delivery announce app data RCH lists the app by: a display name and
@@ -400,6 +460,7 @@ fn connect(
         let destination = transport
             .add_destination(private.clone(), DestinationName::new("lxmf", "delivery"))
             .await;
+        crate::received::spawn(&transport, destination.lock().await.desc.address_hash);
         transport
             .set_destination_announce_app_data(&destination, app_data)
             .await;
@@ -450,6 +511,10 @@ fn backend_and_outbox(
 }
 
 /// The worker thread: owns the runtime, transport and backend; `send` blocks here only.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one loop owns the runtime, transport, outbox and their per-connection state"
+)]
 fn run(
     dir: &Path,
     hub_address: &str,
@@ -481,7 +546,7 @@ fn run(
 
     let mut slot: Option<TelemetrySample> = None;
     let mut resend = false;
-    let mut announced = false;
+    let mut last_announce: Option<Instant> = None; // None: announce on the next connected pass
     let mut create: Option<Vec<u8>> = None;
     let mut created = false;
     let mut last_sent: Option<Vec<u8>> = None;
@@ -492,6 +557,7 @@ fn run(
             match next {
                 Ok(Cmd::Fix(sample)) => slot = Some(sample),
                 Ok(Cmd::ResendLast) => resend = true,
+                Ok(Cmd::Announce) => last_announce = None,
                 Ok(Cmd::Marker {
                     change,
                     record,
@@ -499,6 +565,23 @@ fn run(
                 }) => {
                     let result =
                         deposit_marker(&runtime, &outbox, &source_hex, hub, team, change, &record);
+                    update_pending(&outbox);
+                    let _ = reply.send(result);
+                }
+                Ok(Cmd::Picture {
+                    record,
+                    capture,
+                    reply,
+                }) => {
+                    let result = deposit_picture(
+                        &runtime,
+                        &outbox,
+                        &source_hex,
+                        hub,
+                        team,
+                        &record,
+                        &capture,
+                    );
                     update_pending(&outbox);
                     let _ = reply.send(result);
                 }
@@ -517,13 +600,15 @@ fn run(
         if !connected {
             // The create is fire-and-forget; re-send its stored bytes on the next
             // connection (the hub de-duplicates them by command_id).
-            announced = false;
+            last_announce = None;
             created = false;
             continue;
         }
-        if !announced {
+        let every = Duration::from_secs(ANNOUNCE_INTERVAL_S.load(Ordering::Relaxed));
+        if last_announce.is_none_or(|at| at.elapsed() >= every) {
             runtime.block_on(transport.send_announce(&destination, announce_data.as_deref()));
-            announced = true;
+            last_announce = Some(Instant::now());
+            update(|s| s.last_announce_s = Some(now_s()));
         }
 
         if !created {
@@ -590,9 +675,7 @@ fn deposit_marker(
     record: &MarkerRecord,
 ) -> Result<(), String> {
     let fields = markers::message(change, record, source, team, now_s().saturating_mul(1000))?;
-    let prepared = runtime
-        .block_on(outbox.prepare(&fields_request(source, hub, &fields)))
-        .map_err(|e| format!("{e} (the hub must have been reached once)"))?;
+    let prepared = prepare(runtime, outbox, source, hub, &fields)?;
     let kind = match change {
         Change::Create => MessageKind::Application,
         Change::Move | Change::Delete => MessageKind::Telemetry {
@@ -605,8 +688,52 @@ fn deposit_marker(
         .map_err(|e| e.to_string())
 }
 
+fn prepare(
+    runtime: &tokio::runtime::Runtime,
+    outbox: &LocalPropagation,
+    source: &str,
+    hub: &str,
+    fields: &[u8],
+) -> Result<lxmf_runtime::PreparedOutgoing, String> {
+    runtime
+        .block_on(outbox.prepare(&fields_request(source, hub, fields)))
+        .map_err(|e| format!("{e} (the hub must have been reached once)"))
+}
+
+/// Deposits a picture marker (message 1) and the reduced-image upload (message 2) naming
+/// message 1's LXMF message ID, the picture ID.
+///
+/// The outbox orders by (admission second, transient ID) and delivers the oldest first, so the
+/// upload is admitted one second after the marker: the hub refuses an upload that arrives
+/// before its marker (`unknown_picture`, issue #21). The upload is deposited first, so a
+/// failure can never leave a shared marker reported as not placed; an upload left without its
+/// marker is refused by the hub and never attaches to another one.
+fn deposit_picture(
+    runtime: &tokio::runtime::Runtime,
+    outbox: &LocalPropagation,
+    source: &str,
+    hub: &str,
+    team: Option<&str>,
+    record: &MarkerRecord,
+    capture: &markers::PictureCapture,
+) -> Result<(), String> {
+    let now = now_s().saturating_mul(1000);
+    let marker = markers::picture_message(record, &capture.thumbnail, source, team, now)?;
+    let marker = prepare(runtime, outbox, source, hub, &marker)?;
+    let message_id = marker.message_id().map_err(|e| e.to_string())?;
+    let upload = markers::upload_message(record, &message_id, capture, source, now)?;
+    let upload = prepare(runtime, outbox, source, hub, &upload)?;
+    let admitted = now_s();
+    for (prepared, at) in [(upload, admitted.saturating_add(1)), (marker, admitted)] {
+        outbox
+            .deposit_own(prepared, MessageKind::Application, at, None)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Recovers the oldest undelivered change, as a Resource so its completion records delivery
-/// (the app has no receive path for recipient proofs, G-17).
+/// (recipient proofs are not read).
 fn recover_oldest_marker(
     runtime: &tokio::runtime::Runtime,
     outbox: &LocalPropagation,
@@ -842,5 +969,13 @@ mod tests {
                 Err(PublishError::Config { .. })
             ));
         }
+    }
+
+    #[test]
+    fn announce_interval_has_a_floor() {
+        assert!(publish_set_announce_interval(MIN_ANNOUNCE_INTERVAL_S - 1).is_err());
+        assert!(publish_set_announce_interval(MIN_ANNOUNCE_INTERVAL_S).is_ok());
+        assert!(publish_set_announce_interval(DEFAULT_ANNOUNCE_INTERVAL_S).is_ok());
+        assert_eq!(ANNOUNCE_INTERVAL_S.load(Ordering::Relaxed), 1800);
     }
 }

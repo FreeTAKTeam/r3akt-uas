@@ -62,6 +62,7 @@ pub fn camera(seq: u32) -> CameraPose {
         azimuth_error_deg: 1.0,
         elevation_error_deg: 1.0,
         max_speed_mps: 12.0,
+        horizontal_error_m: None,
     }
 }
 

@@ -33,6 +33,7 @@ class SettingsScreen(private val activity: Activity, close: () -> Unit) : Screen
     private val streamInput = EditText(activity)
     private val qualities = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
     private val qualityNote = TextView(activity)
+    private val announceInput = EditText(activity)
     private var shown: List<Pair<String, String>>? = null
     private var checkedAt = 0L
 
@@ -92,6 +93,38 @@ class SettingsScreen(private val activity: Activity, close: () -> Unit) : Screen
                         "storage, shown and logged without credentials. Streaming starts only from MENU → STREAM.",
                     frame.mono, 12f, Hud.DIM,
                 ))
+                // Publish builds only: the announce lets peers (REM) open a link to the app.
+                if (Variant.source.markerOps() != null) {
+                    addView(heading("MESH ANNOUNCE"))
+                    addView(LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        addView(text("Announce every (s)", frame.label, 15f, Hud.WHITE), LinearLayout.LayoutParams(0, WRAP_CONTENT, 3f))
+                        addView(announceInput.apply {
+                            typeface = frame.mono
+                            textSize = 13f
+                            setTextColor(Hud.WHITE)
+                            isSingleLine = true
+                            inputType = InputType.TYPE_CLASS_NUMBER
+                            setText(Prefs.announceIntervalS(activity).toString())
+                            contentDescription = "Announce interval in seconds"
+                        }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 5.5f))
+                        addView(action("SAVE") {
+                            val seconds = announceInput.text.toString().toLongOrNull()
+                            if (seconds != null && seconds >= Prefs.ANNOUNCE_MIN_S) {
+                                Prefs.setAnnounceIntervalS(activity, seconds)
+                                Toast.makeText(activity, "Announce every $seconds s", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(activity, "At least ${Prefs.ANNOUNCE_MIN_S} s", Toast.LENGTH_LONG).show()
+                            }
+                        }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1.5f))
+                    })
+                    addView(text(
+                        "While publishing, the app announces itself when the hub link comes up and then at this " +
+                            "interval (default ${Prefs.ANNOUNCE_DEFAULT_S} s), so peers such as REM can reach it. " +
+                            "MENU → ANNOUNCE announces at once.",
+                        frame.mono, 12f, Hud.DIM,
+                    ))
+                }
                 addView(heading("BUILD CONFIGURATION (READ-ONLY)"))
                 addView(config)
                 addView(text(

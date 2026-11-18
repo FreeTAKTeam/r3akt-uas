@@ -19,7 +19,7 @@ interface AircraftSource {
     /** Called once from the cockpit activity; a source that connects to hardware starts here. */
     fun start(context: Context) {}
 
-    /** A human-readable status report, shown from the cockpit's LOG button. */
+    /** A human-readable status report, shown from the cockpit's MESH button. */
     fun describe(): String
 
     /** Cockpit state for update `seq` (polled every [periodMs]). Unknown values stay null. */
@@ -45,6 +45,13 @@ interface AircraftSource {
 
     /** Media on the aircraft's card, or null when this source has none. */
     fun media(): AircraftMedia? = null
+
+    /**
+     * Takes a picture now for a picture marker (UAS-OBS-005); the source keeps its own original.
+     * [onDone] runs on the main thread with the frame to crop, or null and the reason. With a frame
+     * the text, if any, is a warning (for example: the card photo failed).
+     */
+    fun capturePicture(onDone: (android.graphics.Bitmap?, String?) -> Unit) = onDone(null, "Pictures are not available from this source")
 
     /** Live video surface to place behind the HUD, or null. */
     fun videoView(context: Context): View? = null

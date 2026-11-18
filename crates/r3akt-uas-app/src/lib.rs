@@ -18,6 +18,8 @@ pub mod identity;
 pub mod markers;
 #[cfg(feature = "publish")]
 pub mod publish;
+#[cfg(feature = "publish")]
+pub mod received;
 pub mod sim;
 pub mod telemetry;
 

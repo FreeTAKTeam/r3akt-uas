@@ -88,13 +88,14 @@ class HudView(context: Context) : ViewGroup(context) {
     private val menu = button(Hud.menu, "MENU")
     private val map = button(Hud.map, "MAP").apply { contentDescription = "Map" }
     private val observations = button(Hud.observation, "OBS").apply { contentDescription = "Observations" }
-    private val radar = button(null, "RADAR").apply { contentDescription = "Radar" }
-    private val setup = button(null, "SETUP").apply { contentDescription = "Connection and setup" }
-    private val stream = button(null, "STREAM")
-    private val sessions = button(null, "HIST").apply { contentDescription = "Sessions and recordings" }
+    private val radar = button(Hud.radar, "RADAR").apply { contentDescription = "Radar" }
+    private val setup = button(Hud.setup, "SETUP").apply { contentDescription = "Connection and setup" }
+    private val stream = button(Hud.stream, "STREAM")
+    private val announce = button(Hud.announce, "ANNOUNCE").apply { contentDescription = "Announce this app to the mesh" }
+    private val sessions = button(Hud.history, "HIST").apply { contentDescription = "Sessions and recordings" }
     // Invisible: the small radar is drawn below; this only takes the tap.
     private val radarTap = View(context).apply { contentDescription = "Open the radar"; isFocusable = true }
-    private val log = button(Hud.log, "LOG").apply { contentDescription = "Session log" }
+    private val log = button(Hud.mesh, "MESH").apply { contentDescription = "Mesh: hub publishing, markers and status" }
     private val slider = HudSlider(context, { s }, label)
     private val cancel = button(null, "CANCEL")
     private val dismiss = button(Hud.close, bare = true).apply { contentDescription = "Dismiss error" }
@@ -124,6 +125,7 @@ class HudView(context: Context) : ViewGroup(context) {
         add(setup, 756f, 416f, 60f, 52f, Anchor.RIGHT)
         add(sessions, 820f, 416f, 60f, 52f, Anchor.RIGHT)
         add(stream, 888f, 416f, 60f, 52f, Anchor.RIGHT)
+        add(announce, 628f, 416f, 60f, 52f, Anchor.RIGHT)
         add(slider, 308f, 266f, 344f, 52f, Anchor.CENTER)
         add(cancel, 562f, 330f, 90f, 44f, Anchor.CENTER)
         add(dismiss, 642f, 408f, 44f, 44f, Anchor.CENTER)
@@ -143,6 +145,7 @@ class HudView(context: Context) : ViewGroup(context) {
         cameraMode.setOnClickListener { onAction(if (state.cameraMode == CameraMode.VIDEO) FlightAction.PHOTO_MODE else FlightAction.VIDEO_MODE) }
         gimbalTap.setOnClickListener { onAction(gimbalAction()) }
         stream.setOnClickListener { onAction(if (state.streaming) FlightAction.STREAM_STOP else FlightAction.STREAM_START) }
+        announce.setOnClickListener { onAction(FlightAction.ANNOUNCE) }
         slider.onConfirm = { pending?.let { pending = null; applyState(); onAction(it) } }
         cancel.setOnClickListener { pending = null; applyState() }
         dismiss.setOnClickListener { alert = null }
@@ -183,6 +186,7 @@ class HudView(context: Context) : ViewGroup(context) {
         stream.isEnabled = (if (st.streaming) FlightAction.STREAM_STOP else FlightAction.STREAM_START) in st.actions
         stream.contentDescription = (if (st.streaming) "Stop the video stream" else "Stream video to the video server") +
             if (stream.isEnabled) "" else ", unavailable"
+        announce.isEnabled = FlightAction.ANNOUNCE in st.actions
         gimbalTap.isEnabled = gimbalAction() in st.actions
         gimbalTap.contentDescription = (if (gimbalAction() == FlightAction.GIMBAL_DOWN) "Point the gimbal down" else "Level the gimbal") +
             if (gimbalTap.isEnabled) "" else ", unavailable"
@@ -205,7 +209,7 @@ class HudView(context: Context) : ViewGroup(context) {
 
         menu.icon = if (menuOpen) Hud.close else Hud.menu
         menu.contentDescription = if (menuOpen) "Close menu" else "Menu"
-        for (v in listOf(map, observations, log, radar, setup, sessions, stream)) v.visibility = if (menuOpen) VISIBLE else GONE
+        for (v in listOf(map, observations, log, radar, setup, sessions, stream, announce)) v.visibility = if (menuOpen) VISIBLE else GONE
         invalidate()
     }
 

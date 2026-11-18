@@ -11,10 +11,15 @@ import org.r3akt.uas.bridge.OwnMarker
 import org.r3akt.uas.bridge.PublishState
 import org.r3akt.uas.bridge.TelemetrySample
 import org.r3akt.uas.bridge.markerList
+import org.r3akt.uas.bridge.publishAnnounce
 import org.r3akt.uas.bridge.publishOfferFix
+import org.r3akt.uas.bridge.publishSetAnnounceInterval
 import org.r3akt.uas.bridge.publishStart
 import org.r3akt.uas.bridge.publishStatus
 import org.r3akt.uas.bridge.publishStop
+import org.r3akt.uas.bridge.receivedMarkers
+import org.r3akt.uas.bridge.receivedReport
+import org.r3akt.uas.hud.FlightAction
 import org.r3akt.uas.hud.HudState
 import org.r3akt.uas.hud.HudView
 import java.io.File
@@ -36,7 +41,7 @@ class PublishingSource(
     private val inner: AircraftSource,
     private val storeName: String,
     private val fix: (seq: UInt) -> TelemetrySample?,
-    private val cameraPose: ((seq: UInt, fix: TelemetrySample) -> CameraPose)?,
+    private val cameraPose: ((seq: UInt, fix: TelemetrySample) -> CameraPose?)?,
 ) : AircraftSource by inner {
     override val name = "${inner.name}, RCH publish test build"
 
@@ -51,8 +56,13 @@ class PublishingSource(
     // Start and stop run here, in order: stop can block for one send's path wait (POST F1).
     private val worker = Executors.newSingleThreadExecutor()
 
+    private var app: Application? = null
+    /** The announce interval last handed to the publisher, so a SETTINGS change applies while running. */
+    @Volatile private var announceS = 0L
+
     override fun install(app: Application) {
         inner.install(app)
+        this.app = app
         storeDir = File(app.noBackupFilesDir, storeName).path
         app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             // The cockpit only: DJI's USB accessory activity also pauses it on a controller reconnect.
@@ -92,19 +102,32 @@ class PublishingSource(
     private fun hudIn(v: View): HudView? = v as? HudView
         ?: (v as? ViewGroup)?.let { g -> (0 until g.childCount).firstNotNullOfOrNull { hudIn(g.getChildAt(it)) } }
 
-    // Inner contacts (simulated ones in simNet) plus this app's markers. A marker placed from a
-    // simulated aircraft carries the "SIMULATED · " note prefix (markers.rs), so it counts as simulated.
-    override fun contacts(): List<Contact> = inner.contacts() + markerCache.map { m ->
-        Contact(
-            id = m.objectId, name = m.name, symbol = m.symbol, lat = m.lat, lon = m.lon,
-            source = "this app",
-            simulated = m.notes?.startsWith("SIMULATED") == true,
-            positionTimeMs = m.updatedMs, contactTimeMs = m.updatedMs, receivedTimeMs = null,
-        )
+    // Inner contacts (simulated ones in simNet), this app's markers and the team markers received
+    // from the hub (UAS-PRD-013). A marker placed from a simulated aircraft carries the
+    // "SIMULATED · " note prefix (markers.rs), so it counts as simulated.
+    override fun contacts(): List<Contact> {
+        val own = markerCache
+        val received = receivedMarkers().filter { r -> own.none { it.objectId == r.marker.objectId } }
+        return inner.contacts() + own.map { m ->
+            Contact(
+                id = m.objectId, name = m.name, symbol = m.symbol, lat = m.lat, lon = m.lon,
+                source = "this app",
+                simulated = m.notes?.startsWith("SIMULATED") == true,
+                positionTimeMs = m.updatedMs, contactTimeMs = m.updatedMs, receivedTimeMs = null,
+            )
+        } + received.map { r ->
+            val m = r.marker
+            Contact(
+                id = m.objectId, name = m.name, symbol = m.symbol, lat = m.lat, lon = m.lon,
+                source = r.source,
+                simulated = m.notes?.startsWith("SIMULATED") == true,
+                positionTimeMs = m.updatedMs, contactTimeMs = m.updatedMs, receivedTimeMs = r.receivedMs,
+            )
+        }
     }
 
     // The pose that belongs to the last offered fix, stamped with that fix's time.
-    private fun pose(provider: (UInt, TelemetrySample) -> CameraPose): CameraPose? =
+    private fun pose(provider: (UInt, TelemetrySample) -> CameraPose?): CameraPose? =
         lastFix?.let { provider(lastSeq, it) }
 
     private fun startPublishing() {
@@ -125,9 +148,18 @@ class PublishingSource(
         worker.execute { publishStop() }
     }
 
+    override fun perform(action: FlightAction, onResult: (String?) -> Unit) =
+        if (action != FlightAction.ANNOUNCE) inner.perform(action, onResult)
+        else if (!publishing) onResult("Start publishing first: MESH → START PUBLISH")
+        else { publishAnnounce(); onResult(null) }
+
     override fun cockpit(seq: UInt): HudState {
         val state = inner.cockpit(seq)
         if (!publishing) return if (stoppedByPause) state.copy(status = "${state.status} · PUBLISH STOPPED") else state
+        app?.let(Prefs::announceIntervalS)?.takeIf { it != announceS }?.let {
+            announceS = it
+            runCatching { publishSetAnnounceInterval(it.toULong()) }
+        }
         fix(seq)?.let {
             lastSeq = seq
             lastFix = it
@@ -137,7 +169,11 @@ class PublishingSource(
         worker.execute { markerCache = runCatching { markerList() }.getOrDefault(markerCache) }
         val status = publishStatus()
         // MESH is on while the Reticulum interface to the hub reports its stream connected.
-        return state.copy(status = "${state.status} · ${status.state.name} ${status.fixesSent}", mesh = status.hubConnected)
+        return state.copy(
+            status = "${state.status} · ${status.state.name} ${status.fixesSent}",
+            mesh = status.hubConnected,
+            actions = state.actions + FlightAction.ANNOUNCE,
+        )
     }
 
     override fun describe(): String = inner.describe() + "\n" + publicationReport()
@@ -154,6 +190,8 @@ class PublishingSource(
             appendLine("state ${s.state.name}${if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""}")
             appendLine("hub connected ${s.hubConnected}, create sent ${s.createSent}, fixes sent ${s.fixesSent}")
             appendLine("operator markers waiting for the hub: ${s.markersPending}")
+            appendLine(receivedReport())
+            appendLine("last announce ${s.lastAnnounceS?.let { "${System.currentTimeMillis() / 1000 - it} s ago" } ?: "-"}, every ${announceS.takeIf { it > 0 } ?: "-"} s")
             val fix = s.lastSentFix
             appendLine(
                 if (fix == null) "last sent fix -"
@@ -183,8 +221,8 @@ class PublishingSource(
                 when {
                     publishing -> "${s.state.name}, hub connected ${s.hubConnected}, fixes sent ${s.fixesSent}" +
                         if (s.state == PublishState.SENT) " (handed to LXMF, not confirmed by the hub)" else ""
-                    stoppedByPause -> "Stopped when the cockpit paused; LOG → START PUBLISH"
-                    else -> "Off; LOG → START PUBLISH"
+                    stoppedByPause -> "Stopped when the cockpit paused; MESH → START PUBLISH"
+                    else -> "Off; MESH → START PUBLISH"
                 } + (error?.let { "\nError: $it" } ?: ""),
             ),
         )
