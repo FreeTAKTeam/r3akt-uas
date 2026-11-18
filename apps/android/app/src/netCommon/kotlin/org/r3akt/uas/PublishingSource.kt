@@ -31,7 +31,7 @@ import java.util.concurrent.Executors
  * starts on the operator's tap in the session log and stops when the cockpit activity pauses (D-16);
  * while it runs, the same button opens the operator-marker list and a tap on the aim cross places a marker.
  * Each flavour has its own [storeName], so its identity, aircraft and markers stay its own.
- * The app reports "sent", never "accepted": it cannot read the hub's results (G-17).
+ * The app reports "sent", never "accepted"; a refusal the hub sends back shows on the MESH status.
  *
  * @param fix the source's current fix, or `null` when it has none; offered on every cockpit poll,
  *   and the Rust publisher decides what is sent (UAS-VID-005).
@@ -89,14 +89,14 @@ class PublishingSource(
     // Markers are stored by the publisher, so placing one needs publishing on.
     override fun aimAction(): (Activity, HudView) -> Unit = { activity, hud ->
         if (publishing) AimMarkerPanel(activity, hud, worker, cameraPose?.let { { pose(it) } }).show()
-        else hud.alert = "NO MARKER · PUBLISHING OFF" to "Open LOG, tap START PUBLISH"
+        else hud.alert = "NO MARKER · PUBLISHING OFF" to "Open MESH, tap START PUBLISH"
     }
 
     // Radar pick (D-10 (b)): the aim-cross naming flow, placed at the picked range and true bearing.
     override fun radarPick(): (Activity, Double, Double) -> Unit = { activity, rangeM, bearingDeg ->
         val hud = hudIn(activity.window.decorView)
         if (publishing && hud != null) AimMarkerPanel(activity, hud, worker, null, rangeM to bearingDeg).show()
-        else Toast.makeText(activity, "NO MARKER · PUBLISHING OFF: open LOG, tap START PUBLISH", Toast.LENGTH_LONG).show()
+        else Toast.makeText(activity, "NO MARKER · PUBLISHING OFF: open MESH, tap START PUBLISH", Toast.LENGTH_LONG).show()
     }
 
     private fun hudIn(v: View): HudView? = v as? HudView

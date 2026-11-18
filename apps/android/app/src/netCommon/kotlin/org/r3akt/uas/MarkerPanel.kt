@@ -25,7 +25,7 @@ class BridgeMarkerOps(override val worker: Executor, private val isPublishing: (
     override fun resendLastFix() = publishResendLastFix()
 }
 
-/** The LOG's MARKERS panel: the shared [MarkerList] in a dialog. */
+/** The MESH dialog's MARKERS panel: the shared [MarkerList] in a dialog. */
 class MarkerPanel(private val activity: Activity, private val ops: MarkerOps) {
     fun show() {
         val list = MarkerList(activity, ops)

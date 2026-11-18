@@ -183,7 +183,7 @@ object Dji4Source : AircraftSource {
             Dji4Sdk.firmware()?.let { SetupItem("Firmware", SetupState.OK, it) }
                 ?: SetupItem("Firmware", SetupState.UNKNOWN, if (connected) "Not reported by the SDK" else "No aircraft connected"),
             // The decoder's health is in the MESH report; reading it here would reset its rate counters.
-            if (connected) SetupItem("Video", SetupState.UNKNOWN, "Primary feed opened behind the HUD; feed rate and decoder state: LOG")
+            if (connected) SetupItem("Video", SetupState.UNKNOWN, "Primary feed opened behind the HUD; feed rate and decoder state: MESH")
             else SetupItem("Video", SetupState.WAITING, "No aircraft connected, no video"),
         )
     }

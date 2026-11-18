@@ -144,8 +144,9 @@ pub(crate) fn picture_message(
     )
 }
 
-/// Command ID prefix of an upload, so the hub's answer to it can be recognised.
-pub(crate) const UPLOAD_ID_PREFIX: &str = "uas-picture-upload-";
+/// Every command ID this app sends starts here, so the hub's answers to it can be recognised.
+pub(crate) const COMMAND_ID_PREFIX: &str = "uas-";
+const UPLOAD_ID_PREFIX: &str = "uas-picture-upload-";
 
 /// The reduced image for the hub only (message 2): no team field, so RCH relays it to nobody.
 /// `message_id` is the picture marker message's LXMF message ID, the picture ID.
@@ -269,9 +270,9 @@ pub fn marker_create(name: &str, affiliation: Affiliation) -> Result<OwnMarker, 
         now_ms(),
     )
     .map_err(refused)?;
-    submit_marker(Change::Create, record.clone()).map_err(refused)?;
-    save(&dir, &record).map_err(refused)?;
-    Ok(OwnMarker::from(&record))
+    save_then_share(&dir, &record, None, || {
+        submit_marker(Change::Create, record.clone())
+    })
 }
 
 /// Places a marker where the camera centre meets the ground (mode D-10 (c)), with the
@@ -300,9 +301,9 @@ pub fn marker_create_at_camera(
     )
     .map_err(refused)?;
     record.notes = Some(camera_note(fix.simulated, &point));
-    submit_marker(Change::Create, record.clone()).map_err(refused)?;
-    save(&dir, &record).map_err(refused)?;
-    Ok(OwnMarker::from(&record))
+    save_then_share(&dir, &record, None, || {
+        submit_marker(Change::Create, record.clone())
+    })
 }
 
 /// The two transmitted images of a picture marker, JPEG bytes cropped by the app (UAS-OBS-005).
@@ -395,16 +396,31 @@ pub fn marker_create_picture(
     let point = crate::camera::camera_point(&fix, &pose, u64::try_from(now).unwrap_or(0))
         .map_err(|e| refused(format!("no camera point: {e}")))?;
     let record = picture_record(name, &fix, &pose, &point, &capture, now).map_err(refused)?;
-    // Saved before sharing, so a failed save never leaves a shared marker reported as not placed
-    // (issue #21). A refused share removes it again; one the worker may still finish keeps it.
-    save(&dir, &record).map_err(refused)?;
-    if let Err(error) = submit_picture(record.clone(), capture) {
+    save_then_share(&dir, &record, None, || {
+        submit_picture(record.clone(), capture)
+    })
+}
+
+/// Saves `record` in the local list, then shares it with `submit`. Saving first means a failed
+/// save never leaves a shared marker reported as not placed (issue #21). A refused share puts
+/// `previous` back (or removes a new marker); one the worker may still finish keeps the save.
+fn save_then_share(
+    dir: &Path,
+    record: &MarkerRecord,
+    previous: Option<&MarkerRecord>,
+    submit: impl FnOnce() -> Result<(), String>,
+) -> Result<OwnMarker, PublishError> {
+    save(dir, record).map_err(refused)?;
+    if let Err(error) = submit() {
         if error != crate::publish::NO_ANSWER {
-            let _ = remove(&dir, &record.object_destination_hash);
+            let _ = match previous {
+                Some(old) => save(dir, old),
+                None => remove(dir, &record.object_destination_hash),
+            };
         }
         return Err(refused(error));
     }
-    Ok(OwnMarker::from(&record))
+    Ok(OwnMarker::from(record))
 }
 
 /// Farthest offset placement: the radar's largest range (UAS-PRD-005).
@@ -435,9 +451,9 @@ pub fn marker_create_at_offset(
     )
     .map_err(refused)?;
     record.notes = Some(offset_note(fix.simulated, bearing_deg, range_m));
-    submit_marker(Change::Create, record.clone()).map_err(refused)?;
-    save(&dir, &record).map_err(refused)?;
-    Ok(OwnMarker::from(&record))
+    save_then_share(&dir, &record, None, || {
+        submit_marker(Change::Create, record.clone())
+    })
 }
 
 pub(crate) fn offset_position(
@@ -487,16 +503,17 @@ pub(crate) fn camera_note(
 #[uniffi::export]
 pub fn marker_move(object_id: &str) -> Result<OwnMarker, PublishError> {
     let (dir, fix) = placement()?;
-    let mut record = load(&dir, object_id)
+    let previous = load(&dir, object_id)
         .map_err(refused)?
         .ok_or_else(|| refused("not one of this app's markers"))?;
     let position =
         Position::new(fix.latitude_deg, fix.longitude_deg).map_err(|e| refused(e.to_string()))?;
+    let mut record = previous.clone();
     record.move_to(position, now_ms());
     record.notes = Some(position_note(fix.simulated));
-    submit_marker(Change::Move, record.clone()).map_err(refused)?;
-    save(&dir, &record).map_err(refused)?;
-    Ok(OwnMarker::from(&record))
+    save_then_share(&dir, &record, Some(&previous), || {
+        submit_marker(Change::Move, record.clone())
+    })
 }
 
 /// Deletes one of the app's markers.
@@ -736,6 +753,21 @@ mod tests {
         remove(&dir, &rec.object_destination_hash).unwrap();
         assert!(list(&dir).unwrap().is_empty());
         assert!(new_record("  ", Affiliation::Unknown, 45.0, 7.0, false, 1).is_err());
+
+        // A refused share undoes the save; one the worker may still finish keeps it.
+        let fail = || Err::<(), _>("outbox full".to_owned());
+        assert!(save_then_share(&dir, &rec, None, fail).is_err());
+        assert!(list(&dir).unwrap().is_empty());
+        let no_answer = || Err::<(), _>(crate::publish::NO_ANSWER.to_owned());
+        assert!(save_then_share(&dir, &rec, None, no_answer).is_err());
+        assert_eq!(list(&dir).unwrap().len(), 1);
+        let mut moved = rec.clone();
+        moved.move_to(Position::new(46.0, 8.0).unwrap(), 3);
+        assert!(save_then_share(&dir, &moved, Some(&rec), fail).is_err());
+        let stored = || load(&dir, &rec.object_destination_hash).unwrap().unwrap();
+        assert_eq!(stored(), rec);
+        assert!(save_then_share(&dir, &moved, Some(&rec), || Ok(())).is_ok());
+        assert_eq!(stored(), moved);
         assert!(new_record("x", Affiliation::Unknown, 91.0, 7.0, false, 1).is_err());
     }
 }
