@@ -12,7 +12,9 @@ use r3akt_map_core::MarkerRecord;
 use r3akt_map_core::replica::{
     DELETE_EVENT, UPSERT_EVENTS, from_api_value, replica_id, supersedes,
 };
-use r3akt_profile_rch::{EventEnvelope, FIELD_EVENT};
+use r3akt_profile_rch::{
+    CommandResultEnvelope, CommandResultStatus, EventEnvelope, FIELD_EVENT, FIELD_RESULTS,
+};
 use rns_transport::hash::AddressHash;
 use rns_transport::resource::ResourceEventKind;
 use rns_transport::transport::{ReceivedPayloadMode, Transport};
@@ -149,15 +151,50 @@ fn receive(destination: [u8; 16], payload: &[u8], mode: InboundPayloadMode, now:
     count(DECODED);
     let sender = hex(&message.source);
     // The decoded fields as JSON, as the shared `sensor_frame::decode_json` reads them.
-    let Some(events) = message
+    let Some(fields) = message
         .fields
         .and_then(|fields| serde_json::to_value(fields).ok())
-        .and_then(|fields| fields.get(FIELD_EVENT.to_string()).cloned())
     else {
+        return;
+    };
+    if let Some(results) = fields.get(FIELD_RESULTS.to_string()) {
+        for refusal in picture_refusals(results.clone()) {
+            crate::publish::report_error(refusal);
+        }
+    }
+    let Some(events) = fields.get(FIELD_EVENT.to_string()).cloned() else {
         return;
     };
     count(WITH_EVENTS);
     apply(events, &sender, now);
+}
+
+/// The hub's refusals of this app's picture uploads in a `FIELD_RESULTS` value (issue #21), so a
+/// refused photo is reported instead of staying pending without a word.
+fn picture_refusals(results: serde_json::Value) -> Vec<String> {
+    let results: Vec<CommandResultEnvelope> = match results {
+        serde_json::Value::Array(items) => items
+            .into_iter()
+            .filter_map(|r| serde_json::from_value(r).ok())
+            .collect(),
+        one => serde_json::from_value(one).into_iter().collect(),
+    };
+    results
+        .into_iter()
+        .filter(|r| {
+            r.status == CommandResultStatus::Rejected
+                && r.command_id.starts_with(crate::markers::UPLOAD_ID_PREFIX)
+        })
+        .map(|r| {
+            format!(
+                "photo upload refused by the hub: {} {}",
+                r.reason_code.as_deref().unwrap_or("rejected"),
+                r.reason.as_deref().unwrap_or_default()
+            )
+            .trim_end()
+            .to_owned()
+        })
+        .collect()
 }
 
 /// Applies the `mission.marker.*` events in a `FIELD_EVENT` value (one envelope or a list).
@@ -331,6 +368,26 @@ mod tests {
             got.iter()
                 .any(|m| m.marker.name == "Neutral 2" && m.received_ms == 7),
             "{got:?}"
+        );
+    }
+
+    #[test]
+    fn only_refused_picture_uploads_are_reported() {
+        let got = picture_refusals(json!([
+            {"command_id": "uas-picture-upload-ab12", "status": "rejected",
+             "reason_code": "unknown_picture", "reason": "no picture marker with this message_id"},
+            {"command_id": "uas-picture-upload-cd34", "status": "result", "result": {"status": "stored"}},
+            {"command_id": "uas-marker-create-ef56", "status": "rejected", "reason_code": "unauthorized"},
+        ]));
+        assert_eq!(
+            got,
+            [
+                "photo upload refused by the hub: unknown_picture no picture marker with this message_id"
+            ]
+        );
+        assert!(
+            picture_refusals(json!({"command_id": "uas-picture-upload-1", "status": "accepted"}))
+                .is_empty()
         );
     }
 

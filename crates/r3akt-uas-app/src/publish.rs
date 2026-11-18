@@ -296,12 +296,20 @@ pub(crate) fn last_fix() -> Option<TelemetrySample> {
         .clone()
 }
 
+/// Shows an error on the MESH status, for what the receiver learns from the hub.
+pub(crate) fn report_error(error: String) {
+    update(|s| s.last_error = Some(error));
+}
+
 pub(crate) fn store_dir() -> Option<std::path::PathBuf> {
     STORE_DIR
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone()
 }
+
+/// The worker did not answer in time: it may still deposit the change.
+pub(crate) const NO_ANSWER: &str = "publisher did not answer";
 
 /// Hands one marker change to the worker and waits until the custody outbox holds it.
 pub(crate) fn submit_marker(change: Change, record: MarkerRecord) -> Result<(), String> {
@@ -338,7 +346,7 @@ fn submit(
     }
     result
         .recv_timeout(MARKER_REPLY_TIMEOUT)
-        .map_err(|_| "publisher did not answer".to_owned())?
+        .map_err(|_| NO_ANSWER.to_owned())?
 }
 
 /// Seconds between announces while connected (owner, 15 November 2026: default 1800).
@@ -692,9 +700,14 @@ fn prepare(
         .map_err(|e| format!("{e} (the hub must have been reached once)"))
 }
 
-/// Deposits a picture marker (message 1), then the reduced-image upload (message 2) naming
-/// message 1's LXMF message ID, the picture ID. The outbox sends oldest first, so the thumbnail
-/// never waits behind the larger upload.
+/// Deposits a picture marker (message 1) and the reduced-image upload (message 2) naming
+/// message 1's LXMF message ID, the picture ID.
+///
+/// The outbox orders by (admission second, transient ID) and delivers the oldest first, so the
+/// upload is admitted one second after the marker: the hub refuses an upload that arrives
+/// before its marker (`unknown_picture`, issue #21). The upload is deposited first, so a
+/// failure can never leave a shared marker reported as not placed; an upload left without its
+/// marker is refused by the hub and never attaches to another one.
 fn deposit_picture(
     runtime: &tokio::runtime::Runtime,
     outbox: &LocalPropagation,
@@ -710,9 +723,10 @@ fn deposit_picture(
     let message_id = marker.message_id().map_err(|e| e.to_string())?;
     let upload = markers::upload_message(record, &message_id, capture, source, now)?;
     let upload = prepare(runtime, outbox, source, hub, &upload)?;
-    for prepared in [marker, upload] {
+    let admitted = now_s();
+    for (prepared, at) in [(upload, admitted.saturating_add(1)), (marker, admitted)] {
         outbox
-            .deposit_own(prepared, MessageKind::Application, now_s(), None)
+            .deposit_own(prepared, MessageKind::Application, at, None)
             .map_err(|e| e.to_string())?;
     }
     Ok(())
