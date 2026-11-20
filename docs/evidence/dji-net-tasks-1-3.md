@@ -50,7 +50,7 @@ Recorded 10 November 2026 for branch `feat/dji-net`; plan: [DJI field-trial buil
 
 ## Debug build against the R3AKT Server
 
-- **Hub:** REM's default "R3AKT Server" at `134.122.46.48:37428`, hub destination `c4de028671f01d9649aabb85e73b50a4`, team BLUE.
+- **Hub:** REM's default "R3AKT Server" (`<hub-address>`, hub destination `<hub-destination>`), team BLUE.
 - **Builds:** `simNet` and `dji4Net` were built for it, and the port is reachable.
 - **Simulator check from the Pixel:**
   - result: hub connected; the aircraft create was sent; 40 fixes went to LXMF in about 40 s at 1 Hz;

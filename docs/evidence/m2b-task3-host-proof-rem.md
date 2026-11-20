@@ -16,9 +16,9 @@ Recorded 10 November 2026 by the agent on the owner's machine. The publisher is 
 ## Hub setup (header `X-API-Key`)
 
 ```bash
-curl -X POST $HUB/api/r3akt/teams        -d '{"uid":"43341e5c822d99857fa6e8641f2ca9c0"}'      # BLUE, by UID (G-21)
-curl -X POST $HUB/api/r3akt/team-members -d '{"team_uid":"43341e5c822d99857fa6e8641f2ca9c0","rns_identity":"9d1a1963c3e150156227425482e695a9","display_name":"REM Sigma633"}'
-curl -X POST $HUB/api/r3akt/team-members -d '{"team_uid":"43341e5c822d99857fa6e8641f2ca9c0","rns_identity":"a8e4643c7f217de46e01f654fc12ece3","display_name":"R3AKT UAS host"}'
+curl -X POST $HUB/api/r3akt/teams        -d '{"uid":"<team-blue-uid>"}'      # BLUE, by UID (G-21)
+curl -X POST $HUB/api/r3akt/team-members -d '{"team_uid":"<team-blue-uid>","rns_identity":"9d1a1963c3e150156227425482e695a9","display_name":"REM Sigma633"}'
+curl -X POST $HUB/api/r3akt/team-members -d '{"team_uid":"<team-blue-uid>","rns_identity":"a8e4643c7f217de46e01f654fc12ece3","display_name":"R3AKT UAS host"}'
 curl -X PUT  $HUB/api/r3akt/capabilities/a8e4643c7f217de46e01f654fc12ece3/mission.content.write -d '{}'
 # the 2a store: same two calls with 4d8ffce8db31d5f2a063a7906f46d191
 ```
@@ -26,10 +26,10 @@ curl -X PUT  $HUB/api/r3akt/capabilities/a8e4643c7f217de46e01f654fc12ece3/missio
 ## Runs
 
 ```bash
-uas-sim --publish 127.0.0.1:4246 44f1b6fb7a69f3d06db9b58793bfebac --store <fresh> --team 43341e5c822d99857fa6e8641f2ca9c0 --seconds 60 --resend-at 30
-uas-sim --publish 127.0.0.1:4246 44f1b6fb7a69f3d06db9b58793bfebac --store <fresh> --team 43341e5c822d99857fa6e8641f2ca9c0 --seconds 30   # restart
+uas-sim --publish 127.0.0.1:4246 44f1b6fb7a69f3d06db9b58793bfebac --store <fresh> --team <team-blue-uid> --seconds 60 --resend-at 30
+uas-sim --publish 127.0.0.1:4246 44f1b6fb7a69f3d06db9b58793bfebac --store <fresh> --team <team-blue-uid> --seconds 30   # restart
 # then REM force-stop and relaunch
-uas-sim --publish 127.0.0.1:4246 44f1b6fb7a69f3d06db9b58793bfebac --store <2a store> --team 43341e5c822d99857fa6e8641f2ca9c0 --seconds 20
+uas-sim --publish 127.0.0.1:4246 44f1b6fb7a69f3d06db9b58793bfebac --store <2a store> --team <team-blue-uid> --seconds 20
 ```
 
 Hub trace for the fresh store (scripts `store.py` and `runs.py` from the [task 5 proof](m2a-task5-hub-host-proof.md); `relays.py` from the [spike](m2b-task0-rem-relay-spike.md)):

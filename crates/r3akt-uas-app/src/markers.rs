@@ -617,7 +617,7 @@ mod tests {
             (Change::Move, "mission.marker.position.patch"),
             (Change::Delete, "mission.marker.delete"),
         ] {
-            let team = Some("43341e5c822d99857fa6e8641f2ca9c0");
+            let team = r3akt_profile_rch::teams::canonical_team_uid_for_color("BLUE");
             let bytes = message(
                 change,
                 &rec,
@@ -666,7 +666,7 @@ mod tests {
             (rec.marker_type.as_str(), rec.symbol.as_str()),
             ("picture", "picture")
         );
-        let team = Some("43341e5c822d99857fa6e8641f2ca9c0");
+        let team = r3akt_profile_rch::teams::canonical_team_uid_for_color("BLUE");
 
         // Message 1: the create with picture metadata, team field 11 and the thumbnail in field 6.
         let bytes = picture_message(&rec, &capture.thumbnail, "s", team, 1).unwrap();

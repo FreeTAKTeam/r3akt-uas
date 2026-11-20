@@ -27,10 +27,10 @@ The `simNet` variant publishes the simulator to an RCH hub; `dji4Net` publishes 
 ./gradlew -Pr3aktPublish=true -Pr3aktHubAddress=<host>:4242 -Pr3aktHubDestination=<hub lxmf.delivery hash> [-Pr3aktTeamUid=<RCH canonical team UID>] :app:assembleSimNetDebug   # or :app:assembleDji4NetDebug, which also needs djiApiKey
 ```
 
-For the R3AKT Server, REM's default "R3AKT Server" (`134.122.46.48:37428`, hub destination `c4de028671f01d9649aabb85e73b50a4`), with team BLUE:
+For REM's default "R3AKT Server", with team BLUE (its address, destination and the BLUE UID are not kept in this repository):
 
 ```bash
-./gradlew -Pr3aktPublish=true -Pr3aktHubAddress=134.122.46.48:37428 -Pr3aktHubDestination=c4de028671f01d9649aabb85e73b50a4 -Pr3aktTeamUid=43341e5c822d99857fa6e8641f2ca9c0 :app:assembleDji4NetDebug
+./gradlew -Pr3aktPublish=true -Pr3aktHubAddress=<hub-address> -Pr3aktHubDestination=<hub-destination> -Pr3aktTeamUid=<team-blue-uid> :app:assembleDji4NetDebug
 ```
 
 Publishing starts from MESH → START PUBLISH (the menu button was called LOG before 15 November 2026) and stops when the cockpit screen pauses, but not when DJI's controller screen opens; the status bar then shows `PUBLISH STOPPED` (D-16). Each variant keeps its own identity and store, so the DJI aircraft is a separate object from the simulator on the same phone. `dji4Net` sends a fix only with DJI GPS signal level 3 or better, and without accuracy. Its altitude is take-off-relative, so it travels as an unknown datum. PLACE AT CAMERA is refused because DJI SDK 4 reports no position accuracy (D-15). The hub operator must grant `mission.content.write` to the app destination hash shown in the log before fixes are applied. With a team, the operator also adds that destination hash, and each REM client's destination hash, as members of the team (create the team by its canonical UID); the hub then relays the aircraft to those REM clients.
