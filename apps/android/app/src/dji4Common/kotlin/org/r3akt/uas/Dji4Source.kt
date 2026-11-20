@@ -106,7 +106,7 @@ object Dji4Source : AircraftSource {
                 d.flying == false -> "ON GROUND"
                 else -> "CONNECTED"
             },
-            simulated = false,
+            simulated = d.simulated == true,
             airborne = d.flying,
             rthActive = d.goingHome,
             flightMode = d.flightMode,
@@ -196,9 +196,11 @@ object Dji4Source : AircraftSource {
         },
     )
 
-    /** The current DJI state as a publishable fix, or `null`: the rules are Rust's `dji_sample`. */
+    /** The current DJI state as a publishable fix, or `null`: the rules are Rust's `dji_sample`.
+     *  None while DJI's simulator runs or may run: `dji_sample` can only mark a fix real. */
     fun fix(): TelemetrySample? {
         val d = Dji4Sdk.state()
+        if (d.simulated != false) return null
         val pose = d.pose ?: return null
         val at = d.receivedAtMs ?: return null
         return djiSample(

@@ -68,6 +68,30 @@ object Prefs {
         prefs(context).edit().putInt("radar_range_m", metres).apply()
     }
 
+    /** Hub settings saved on SETTINGS (publish builds), each null when not saved. */
+    data class Hub(val address: String?, val destination: String?, val teamUid: String?)
+
+    fun hub(context: Context): Hub = prefs(context).run {
+        Hub(getString("hub_address", null), getString("hub_destination", null), getString("hub_team_uid", null))
+    }
+
+    /** Saves the hub settings; a null team UID clears it. All null clears every hub setting. */
+    fun setHub(context: Context, hub: Hub) {
+        require(hub.address == null || validHubAddress(hub.address))
+        require(hub.destination == null || validHex32(hub.destination))
+        require(hub.teamUid == null || validHex32(hub.teamUid))
+        prefs(context).edit().apply {
+            listOf("hub_address" to hub.address, "hub_destination" to hub.destination, "hub_team_uid" to hub.teamUid)
+                .forEach { (k, v) -> if (v == null) remove(k) else putString(k, v) }
+        }.apply()
+    }
+
+    /** host:port, the TCP interface of the hub's Reticulum node. */
+    fun validHubAddress(address: String): Boolean = Regex("^\\S+:\\d{1,5}$").matches(address)
+
+    /** A destination hash or RCH team UID: 32 hex digits. */
+    fun validHex32(value: String): Boolean = Regex("^[0-9a-fA-F]{32}$").matches(value)
+
     fun announceIntervalS(context: Context): Long =
         prefs(context).getLong("announce_interval_s", ANNOUNCE_DEFAULT_S).coerceAtLeast(ANNOUNCE_MIN_S)
 

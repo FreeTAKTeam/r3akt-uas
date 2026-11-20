@@ -1,6 +1,6 @@
 # Picture marker: cross-repository contract (proposal)
 
-Status: **agreed with RCH, 17 November 2026**, for [r3akt-uas #19](https://github.com/FreeTAKTeam/r3akt-uas/issues/19) (UAS-OBS-005). The RCH side is [RCH #343](https://github.com/FreeTAKTeam/Reticulum-Community-Hub/pull/343) (commit `82f72e97`, pinned here, not yet merged); the REM side is [REM #351](https://github.com/FreeTAKTeam/reticulum_mobile_emergency_management/pull/351) (commit `4a5673c8`, not yet merged) (gap G-25). The encoder belongs to `r3akt-profile-rch` (RCH repository); this repository only calls it (AGENTS.md ownership rule). Byte caps and JPEG quality are provisional until measured (issue acceptance test 7).
+Status: **agreed with RCH, 17 November 2026**, for [r3akt-uas #19](https://github.com/FreeTAKTeam/r3akt-uas/issues/19) (UAS-OBS-005). The RCH side is [RCH #343](https://github.com/FreeTAKTeam/Reticulum-Community-Hub/pull/343) (commit `82f72e97`, merged as `577e4667`, which is pinned here); the REM side is [REM #351](https://github.com/FreeTAKTeam/reticulum_mobile_emergency_management/pull/351) (commit `4a5673c8`, merged as `48d60acd`) (gap G-25). The encoder belongs to `r3akt-profile-rch` (RCH repository); this repository only calls it (AGENTS.md ownership rule). Byte caps and JPEG quality are provisional until measured (issue acceptance test 7).
 
 ## Image tiers
 

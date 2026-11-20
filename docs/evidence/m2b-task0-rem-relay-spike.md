@@ -12,7 +12,7 @@ Recorded 10 November 2026 on the owner's machine by the agent. No code in this r
 | Hub daemon | `reticulumd` from LXMF-rs `9b972f9a` |
 | REM | `0cfa422` (1.6.1), built from a clean clone following its CI: LXMF-rs `8c27a200` as a sibling, `npm ci`, `npm run mobile:build`, `npx cap sync android`, `cargo +1.99.1 build --target x86_64-linux-android`, `ANDROID_HOME=… ./gradlew :app:assembleDebug` |
 | REM device | Android emulator, x86_64, API 35, portrait. In landscape the setup wizard's fixed header leaves too little room to reach the TCP field. |
-| REM settings | Setup wizard: one TCP endpoint `10.0.2.2:4244` (all community servers unchecked; the default `134.122.46.48:37428` was removed); routing **Connected**, hub `d4f4180cfbfc16d00b52e8408f1a9281`; location and SOS off |
+| REM settings | Setup wizard: one TCP endpoint `10.0.2.2:4244` (all community servers unchecked; the default community server was removed); routing **Connected**, hub `d4f4180cfbfc16d00b52e8408f1a9281`; location and SOS off |
 | Publisher | fresh store; delivery hash `170914f60e71dd664b051c329b1a88df`, object `26924ceabe344616faffab41ce578c37`; 120 s of orbit at 1 Hz, wall-clock fix times |
 
 REM's "Hub identity hash" field takes the hub's **`lxmf.delivery`** hash, which is what REM stores when it picks a hub from heard announces. REM announced as destination `23f92b3d92d817f9b83a491f09af9e91` with capabilities `r3akt`, `emergencymessages`, `telemetry`, `rem.standard_lxmf_receipts.v1`. The hub recorded `client_type` `rem` and `announced_identity_hash` empty, which confirms that membership uses delivery hashes.
@@ -21,9 +21,9 @@ REM's "Hub identity hash" field takes the hub's **`lxmf.delivery`** hash, which 
 
 ```bash
 # The canonical team must be created by UID; {"color":"BLUE"} alone creates a team with a random UID (G-21).
-curl -X POST  $HUB/api/r3akt/teams        -d '{"uid":"43341e5c822d99857fa6e8641f2ca9c0"}'
-curl -X POST  $HUB/api/r3akt/team-members -d '{"team_uid":"43341e5c822d99857fa6e8641f2ca9c0","rns_identity":"170914f60e71dd664b051c329b1a88df","display_name":"R3AKT UAS spike"}'
-curl -X POST  $HUB/api/r3akt/team-members -d '{"team_uid":"43341e5c822d99857fa6e8641f2ca9c0","rns_identity":"23f92b3d92d817f9b83a491f09af9e91","display_name":"REM Beta526"}'
+curl -X POST  $HUB/api/r3akt/teams        -d '{"uid":"<team-blue-uid>"}'
+curl -X POST  $HUB/api/r3akt/team-members -d '{"team_uid":"<team-blue-uid>","rns_identity":"170914f60e71dd664b051c329b1a88df","display_name":"R3AKT UAS spike"}'
+curl -X POST  $HUB/api/r3akt/team-members -d '{"team_uid":"<team-blue-uid>","rns_identity":"23f92b3d92d817f9b83a491f09af9e91","display_name":"REM Beta526"}'
 curl -X PUT   $HUB/api/r3akt/capabilities/170914f60e71dd664b051c329b1a88df/mission.content.write -d '{}'
 ```
 
