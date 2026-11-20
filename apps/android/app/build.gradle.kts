@@ -32,14 +32,14 @@ android {
     }
 
     flavorDimensions += "aircraft"
-    // Hub settings for the publishing test builds come from Gradle properties outside the repository.
+    // Hub defaults for the publishing debug builds come from Gradle properties outside the repository;
+    // release builds carry none (see androidComponents below): the operator enters them on SETTINGS.
     val hub = { name: String -> "\"" + providers.gradleProperty(name).getOrElse("") + "\"" }
     val djiApiKey = providers.gradleProperty("djiApiKey").getOrElse("")
     productFlavors {
         // Simulator: no DJI SDK, no registration credentials, no hardware (UAS-SCF-002).
         create("sim") { dimension = "aircraft" }
         // Test build only (D-4): the simulator plus RCH publication, behind -Pr3aktPublish=true.
-        // Hub address and destination come from Gradle properties outside the repository.
         create("simNet") {
             dimension = "aircraft"
             buildConfigField("String", "HUB_ADDRESS", hub("r3aktHubAddress"))
@@ -116,6 +116,12 @@ val publish = providers.gradleProperty("r3aktPublish").map(String::toBoolean).ge
 androidComponents {
     beforeVariants { variant ->
         variant.enable = (variant.productFlavors.single().second in setOf("simNet", "dji4Net")) == publish
+    }
+    // No hub address, destination or team in a release APK: they are entered on SETTINGS.
+    onVariants(selector().withBuildType("release")) { variant ->
+        if (variant.flavorName in setOf("simNet", "dji4Net")) listOf("HUB_ADDRESS", "HUB_DESTINATION", "TEAM_UID").forEach {
+            variant.buildConfigFields?.put(it, com.android.build.api.variant.BuildConfigField("String", "\"\"", null))
+        }
     }
 }
 

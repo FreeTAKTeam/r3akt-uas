@@ -135,7 +135,8 @@ class PublishingSource(
         stoppedByPause = false
         worker.execute {
             startError = runCatching {
-                publishStart(storeDir, BuildConfig.HUB_ADDRESS, BuildConfig.HUB_DESTINATION, BuildConfig.TEAM_UID.ifEmpty { null })
+                val h = hub()
+                publishStart(storeDir, h.address.orEmpty(), h.destination.orEmpty(), h.teamUid)
             }.exceptionOrNull()?.let { it.message ?: it.toString() }
             if (startError != null) publishing = false
         }
@@ -182,8 +183,9 @@ class PublishingSource(
         val s = publishStatus()
         return buildString {
             appendLine("RCH publication (test build): ${if (publishing) "on" else "off"}")
-            appendLine("hub ${BuildConfig.HUB_ADDRESS.ifEmpty { "(r3aktHubAddress not set)" }}")
-            appendLine("hub destination ${BuildConfig.HUB_DESTINATION.ifEmpty { "(r3aktHubDestination not set)" }}")
+            val h = hub()
+            appendLine("hub ${h.address ?: "(not set)"}")
+            appendLine("hub destination ${h.destination ?: "(not set)"}")
             appendLine("app destination hash ${s.destinationHash ?: "(starts with the first publish)"}")
             appendLine("aircraft object id ${s.objectId ?: "-"}")
             appendLine("team ${s.teamUid ?: "none (field 13 only)"}")
@@ -204,13 +206,11 @@ class PublishingSource(
     override fun setupItems(): List<SetupItem> {
         val s = publishStatus()
         val error = startError ?: s.lastError
-        val missing = listOfNotNull(
-            "r3aktHubAddress".takeIf { BuildConfig.HUB_ADDRESS.isEmpty() },
-            "r3aktHubDestination".takeIf { BuildConfig.HUB_DESTINATION.isEmpty() },
-        )
+        val h = hub()
+        val missing = listOfNotNull("hub address".takeIf { h.address == null }, "hub destination".takeIf { h.destination == null })
         return inner.setupItems() + listOf(
-            if (missing.isEmpty()) SetupItem("Hub", SetupState.OK, "${BuildConfig.HUB_ADDRESS}, destination ${BuildConfig.HUB_DESTINATION}")
-            else SetupItem("Hub", SetupState.PROBLEM, "Not set at build time: ${missing.joinToString()}"),
+            if (missing.isEmpty()) SetupItem("Hub", SetupState.OK, "${h.address}, destination ${h.destination}")
+            else SetupItem("Hub", SetupState.PROBLEM, "Not set: ${missing.joinToString()}; enter them on SETTINGS → HUB"),
             SetupItem(
                 "Hub publishing",
                 when {
@@ -228,10 +228,23 @@ class PublishingSource(
         )
     }
 
-    override fun configItems() = inner.configItems() + listOf(
-        "Hub address" to BuildConfig.HUB_ADDRESS.ifEmpty { "not set (r3aktHubAddress)" },
-        "Hub destination" to BuildConfig.HUB_DESTINATION.ifEmpty { "not set (r3aktHubDestination)" },
-        "Team UID" to BuildConfig.TEAM_UID.ifEmpty { "none (r3aktTeamUid not set)" },
+    // Saved on SETTINGS → HUB; otherwise the build's defaults, which only debug builds carry.
+    private fun hub(): Prefs.Hub {
+        val saved = app?.let(Prefs::hub) ?: Prefs.Hub(null, null, null)
+        return Prefs.Hub(
+            saved.address ?: BuildConfig.HUB_ADDRESS.ifEmpty { null },
+            saved.destination ?: BuildConfig.HUB_DESTINATION.ifEmpty { null },
+            saved.teamUid ?: BuildConfig.TEAM_UID.ifEmpty { null },
+        )
+    }
+
+    override fun configItems() = inner.configItems() + hub().let { h ->
+        listOf(
+            "Hub address" to (h.address ?: "not set"),
+            "Hub destination" to (h.destination ?: "not set"),
+            "Team UID" to (h.teamUid ?: "none"),
+        )
+    } + listOf(
         "App identity (destination hash)" to (publishStatus().destinationHash ?: "created on the first publish"),
     )
 }

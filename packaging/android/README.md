@@ -21,7 +21,7 @@ The first registration needs network access once. Without a key the cockpit show
 
 ## RCH publish test builds (`simNet`, `dji4Net`)
 
-The `simNet` variant publishes the simulator to an RCH hub; `dji4Net` publishes a real DJI aircraft (D-18). They are built only with `-Pr3aktPublish=true`, and that build then contains no `sim` or `dji4` variant. CI builds them without a key or hub settings, only to check that they compile. Hub settings come from Gradle properties outside the repository:
+The `simNet` variant publishes the simulator to an RCH hub; `dji4Net` publishes a real DJI aircraft (D-18). They are built only with `-Pr3aktPublish=true`, and that build then contains no `sim` or `dji4` variant. CI builds them without a key or hub settings, only to check that they compile. The hub address, hub destination and optional team UID are entered on SETTINGS → HUB and kept in the app's private storage. **Release builds carry no hub settings**; debug builds take defaults from Gradle properties outside the repository:
 
 ```bash
 ./gradlew -Pr3aktPublish=true -Pr3aktHubAddress=<host>:4242 -Pr3aktHubDestination=<hub lxmf.delivery hash> [-Pr3aktTeamUid=<RCH canonical team UID>] :app:assembleSimNetDebug   # or :app:assembleDji4NetDebug, which also needs djiApiKey
