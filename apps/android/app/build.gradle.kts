@@ -12,9 +12,23 @@ android {
         applicationId = "org.r3akt.uas"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0-scaffold"
+        versionCode = 2
+        versionName = "0.1.0-alpha.1"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+    }
+
+    // Release signing from Gradle properties outside the repository; without them the release APK is unsigned.
+    val releaseStore = providers.gradleProperty("r3aktReleaseStoreFile").orNull
+    signingConfigs {
+        if (releaseStore != null) create("release") {
+            storeFile = file(releaseStore)
+            storePassword = providers.gradleProperty("r3aktReleaseStorePassword").get()
+            keyAlias = providers.gradleProperty("r3aktReleaseKeyAlias").get()
+            keyPassword = providers.gradleProperty("r3aktReleaseKeyPassword").get()
+        }
+    }
+    buildTypes {
+        getByName("release") { signingConfig = signingConfigs.findByName("release") }
     }
 
     flavorDimensions += "aircraft"
