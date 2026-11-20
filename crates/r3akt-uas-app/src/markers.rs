@@ -246,10 +246,28 @@ fn now_ms() -> i64 {
         .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
 }
 
+/// Oldest aircraft fix a marker is placed from; fix times are whole seconds, so this allows
+/// about 4 s of real age. An older fix means the aircraft position is no longer known.
+const MAX_FIX_AGE_S: u64 = 5;
+
 fn placement() -> Result<(std::path::PathBuf, crate::telemetry::TelemetrySample), PublishError> {
     let dir = store_dir().ok_or_else(|| refused("start publishing first"))?;
     let fix = last_fix().ok_or_else(|| refused("aircraft position unknown"))?;
+    let now_s = u64::try_from(now_ms() / 1000).unwrap_or(0);
+    fresh(&fix, now_s)?;
     Ok((dir, fix))
+}
+
+/// Refuses a fix older than [`MAX_FIX_AGE_S`]: the last fix stays stored after the aircraft
+/// stops reporting, and a marker placed from it would claim an old position as current.
+fn fresh(fix: &crate::telemetry::TelemetrySample, now_s: u64) -> Result<(), PublishError> {
+    let age_s = now_s.saturating_sub(fix.fix_time_s);
+    if age_s > MAX_FIX_AGE_S {
+        return Err(refused(format!(
+            "aircraft position is {age_s} s old: no current position"
+        )));
+    }
+    Ok(())
 }
 
 /// Places a marker at the aircraft's current position (D-10 (a)). Returns once the
@@ -732,6 +750,20 @@ mod tests {
         assert!(offset_position(&fix, 0.0, 0.0).is_err());
         assert!(offset_position(&fix, 0.0, 5_001.0).is_err());
         assert!(offset_position(&fix, f64::NAN, 500.0).is_err());
+    }
+
+    #[test]
+    fn a_stale_fix_places_no_marker() {
+        let fix = crate::sim::sample(0);
+        let t = fix.fix_time_s;
+        assert!(fresh(&fix, t).is_ok());
+        assert!(fresh(&fix, t + MAX_FIX_AGE_S).is_ok());
+        assert!(
+            fresh(&fix, t - 1).is_ok(),
+            "a fix slightly ahead of the clock is current"
+        );
+        let err = fresh(&fix, t + MAX_FIX_AGE_S + 1).unwrap_err();
+        assert!(matches!(err, PublishError::Marker { reason } if reason.contains("6 s old")));
     }
 
     #[test]
