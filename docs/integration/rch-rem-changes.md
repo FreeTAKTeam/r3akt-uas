@@ -1,6 +1,6 @@
 # Companion RCH and REM changes
 
-Status: **specified**; C-RCH-5 (RCH #343) and C-REM-4 (REM #351) in review upstream, the others not started. Each change is made in its own repository under that repository's instructions (`AGENTS.md`), with its own review and fixtures. Nothing here is edited from this repository.
+Status: **specified**; C-RCH-5 (RCH #343, merged as `577e4667`) and C-REM-4 (REM #351, merged as `48d60acd`) merged upstream, the others not started. Each change is made in its own repository under that repository's instructions (`AGENTS.md`), with its own review and fixtures. Nothing here is edited from this repository.
 
 ## RCH
 
