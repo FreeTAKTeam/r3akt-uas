@@ -77,6 +77,8 @@ data class Dji4State(
     val linkPercent: Int?,
     /** DJI's RTMP live stream is running. */
     val streaming: Boolean,
+    /** DJI's built-in flight simulator is running: every flight value is simulated. */
+    val simulated: Boolean?,
 )
 
 /**
@@ -238,6 +240,8 @@ object Dji4Sdk {
             recordingTimeS = cam?.takeIf { it.isRecording }?.currentVideoRecordingTimeInSeconds,
             linkPercent = linkQuality.takeIf { live },
             streaming = live && isStreaming(),
+            // No simulator on this product means none can run; an unreadable one stays unknown.
+            simulated = product?.flightController?.let { fc -> fc.simulator?.let { runCatching { it.isSimulatorActive }.getOrNull() } ?: false },
         )
     }
 

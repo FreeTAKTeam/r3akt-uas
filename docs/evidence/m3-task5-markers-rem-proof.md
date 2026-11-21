@@ -7,11 +7,11 @@ Recorded 10 November 2026 for branch `feat/m3-markers`.
 - **RCH crates:** `r3akt-map-core` and `r3akt-profile-rch` re-pinned from `f5822210` to `83b5d64aac69347c997ac9e88d84242eb87a1814`, which merges RCH #316 (fixes [RCH #315](https://github.com/FreeTAKTeam/Reticulum-Community-Hub/issues/315)). That revision still pins LXMF-rs `9b972f9a`, so LXMF-rs and Rust 1.89 are unchanged.
 - **Encoder switch:** `markers::message` now calls the shared `r3akt_profile_rch::encode_commands_for_team(commands, team)`. With a team it writes field 9 and field 11; without one it writes field 9 only, as before. Nothing in this repository writes field 11.
 - **Tests:** they check that field 11 is present with a team (decoded with the shared `r3akt_map_core::msgpack::to_json`) and that only key `9` is written without one.
-- **Checks:** clippy and the 15 tests pass, and so does `scripts/check.sh`. The default `sim` and `dji4` builds pass, and both still contain no `publish_`/`marker_` symbols. The `simNet` build with `-Pr3aktTeamUid=43341e5c822d99857fa6e8641f2ca9c0` also passes.
+- **Checks:** clippy and the 15 tests pass, and so does `scripts/check.sh`. The default `sim` and `dji4` builds pass, and both still contain no `publish_`/`marker_` symbols. The `simNet` build with `-Pr3aktTeamUid=<team-blue-uid>` also passes.
 
 ## Task 5 setup
 
-- **Hub:** RCH `83b5d64a` (`r3akt-rch-server` with its `reticulumd` at LXMF-rs `9b972f9a`), with team BLUE `43341e5c…`.
+- **Hub:** RCH `83b5d64a` (`r3akt-rch-server` with its `reticulumd` at LXMF-rs `9b972f9a`), with team BLUE.
 - **Publisher:** the Pixel 7 (`simNet`, lxmf.delivery `8db22674…`), a BLUE member with `mission.content.write`, reaching the hub at its Wi-Fi address.
 - **Recipient:** an unchanged REM `0cfa422` on the x86_64 emulator (`9d1a1963…`, BLUE), reaching the hub at `10.0.2.2:4246`.
 - **Method:** every step was driven through the Pixel's marker panel. Recipient state was read from REM's own `rch_markers` table (`run-as … app_state.db`) and from REM's map.

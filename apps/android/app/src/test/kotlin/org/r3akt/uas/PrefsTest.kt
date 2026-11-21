@@ -16,6 +16,16 @@ class PrefsTest {
     }
 
     @Test
+    fun hubValidation() {
+        assertTrue(Prefs.validHubAddress("hub.example:4242"))
+        assertFalse(Prefs.validHubAddress("hub.example"))
+        assertFalse(Prefs.validHubAddress("hub example:4242"))
+        assertTrue(Prefs.validHex32("0123456789abcdef0123456789ABCDEF"))
+        assertFalse(Prefs.validHex32("0123456789abcdef"))
+        assertFalse(Prefs.validHex32("0123456789abcdef0123456789abcdeg"))
+    }
+
+    @Test
     fun redactRemovesCredentials() {
         assertEquals("rtmp://host:1935/uas/a (credentials hidden)", Prefs.redact("rtmp://host:1935/uas/a?user=pilot&pass=secret"))
         assertEquals("rtmp://host/uas/a (credentials hidden)", Prefs.redact("rtmp://pilot:secret@host/uas/a"))

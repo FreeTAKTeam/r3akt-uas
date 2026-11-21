@@ -2,14 +2,14 @@
 
 An independent Android DJI flying application for the R3AKT ecosystem: existing Reticulum/LXMF libraries, RCH telemetry and mission services, REM-compatible markers, aircraft-centred radar, and separate MediaMTX video.
 
-**Status: specification and scaffold (milestone 1).** The specification package and a buildable skeleton exist. No product feature is implemented: there is no flight control, radar, network publication or video yet. See [acceptance.md](docs/specification/acceptance.md) for what is proven and what is not.
+**Status: alpha (0.1.0-alpha.1).** The app has flown: take-off, landing and return home from the app on a Mavic Air 2 with a Pixel 7, with markers published to an RCH hub. Most other features are implemented but unproven, and no product milestone (2–6) has owner acceptance. Read the [tester notes and known limitations](docs/release/0.1.0-alpha.1.md) before flying; [acceptance.md](docs/specification/acceptance.md) records what is proven and what is not.
 
-What the scaffold does:
+What is here:
 
-- `crates/r3akt-uas-app`: thin Rust integration. Encodes and decodes aircraft telemetry with the shared `r3akt-map-core` Telemeter codec (RCH `f5822210`) and provides a deterministic simulated aircraft.
-- `apps/android`: Kotlin app `org.r3akt.uas` with a `sim` variant (no DJI SDK, no credentials) and a `dji4` variant (DJI SDK 4.18; registers and connects only when built with a `djiApiKey`; untested with an aircraft). Kotlin calls Rust through UniFFI-generated bindings.
+- `crates/r3akt-uas-app`: thin Rust integration over the shared RCH and LXMF-rs crates: telemetry, markers (placed and received), camera aim point, publication decisions and the simulated aircraft.
+- `apps/android`: Kotlin app `org.r3akt.uas` with four variants: `sim` (no DJI SDK, no credentials), `dji4` (DJI SDK 4.18), and the publishing test builds `simNet` and `dji4Net` (built with `-Pr3aktPublish=true`). Cockpit with live video, local flight controls, radar, map, markers, sessions and aircraft media. Kotlin calls Rust through UniFFI-generated bindings.
 - `tools/uas-sim`: writes and checks the telemetry fixtures in `fixtures/telemetry/`.
-- Nothing connects to hardware or a network by default.
+- Nothing connects to hardware or a network by default: only the `dji4` builds talk to an aircraft, and only the `Net` builds publish.
 
 ## Build
 
@@ -32,6 +32,6 @@ The `dji4` variant (`:app:assembleDji4Debug`) needs a `djiApiKey` Gradle propert
 - Integration: [existing system and gaps](docs/integration/existing-system-and-gaps.md), [reuse matrix](docs/integration/reuse-matrix.md), [RCH/REM changes](docs/integration/rch-rem-changes.md), [compatibility matrix](docs/integration/compatibility-matrix.md), [PRE review](docs/integration/pre-review.md)
 - Decisions: [ADRs](docs/adr/README.md); repository rules: [AGENTS.md](AGENTS.md)
 
-Additions to the planned tree: `tools/uniffi-bindgen` (pinned binding generator) and `docs/evidence/` (captured acceptance evidence).
+Additions to the planned tree: `tools/uniffi-bindgen` (pinned binding generator), `docs/evidence/` (captured acceptance evidence) and `docs/release/` (release notes and known limitations).
 
 Original code is EPL-2.0 ([LICENSE](LICENSE)); third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

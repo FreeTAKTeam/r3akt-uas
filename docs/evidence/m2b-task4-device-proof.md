@@ -12,7 +12,7 @@ Recorded 10 November 2026 by the agent on the owner's machine.
 ```bash
 ./gradlew -Pr3aktPublish=true -Pr3aktHubAddress=192.168.1.176:4246 \
   -Pr3aktHubDestination=44f1b6fb7a69f3d06db9b58793bfebac \
-  -Pr3aktTeamUid=43341e5c822d99857fa6e8641f2ca9c0 :app:assembleSimNetDebug
+  -Pr3aktTeamUid=<team-blue-uid> :app:assembleSimNetDebug
 ```
 
 - **App identity:** installed over the step 2a test build, so the app kept its identity: delivery hash `8db226748847da27261859bff6e54ebe`, object `0e58ea922931b02480c580a06b19d76d`.
@@ -22,7 +22,7 @@ Recorded 10 November 2026 by the agent on the owner's machine.
 
 ## Pixel 7
 
-![Pixel 7 session log: hub, destination hash, object, team 43341e5c…, state SENT, last sent fix](m2b-simnet-pixel7-log.png)
+![Pixel 7 session log: hub, destination hash, object, team BLUE, state SENT, last sent fix](m2b-simnet-pixel7-log.png)
 
 | Step | Hub |
 |---|---|

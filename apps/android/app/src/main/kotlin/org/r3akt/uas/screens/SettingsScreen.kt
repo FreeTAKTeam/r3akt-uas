@@ -21,7 +21,8 @@ import org.r3akt.uas.hud.HudState
 
 /**
  * Local preferences (Android private storage) and the read-only build configuration.
- * Hub settings and the DJI key are compiled in from Gradle properties; the key is never shown. The video server URL
+ * Hub settings are entered here (publish builds; debug builds may carry defaults). The DJI key is compiled in
+ * from a Gradle property and never shown. The video server URL
  * may hold MediaMTX credentials: it is stored privately and shown only redacted.
  */
 class SettingsScreen(private val activity: Activity, close: () -> Unit) : ScreenPage {
@@ -34,6 +35,9 @@ class SettingsScreen(private val activity: Activity, close: () -> Unit) : Screen
     private val qualities = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
     private val qualityNote = TextView(activity)
     private val announceInput = EditText(activity)
+    private val hubAddress = EditText(activity)
+    private val hubDestination = EditText(activity)
+    private val hubTeam = EditText(activity)
     private var shown: List<Pair<String, String>>? = null
     private var checkedAt = 0L
 
@@ -95,6 +99,25 @@ class SettingsScreen(private val activity: Activity, close: () -> Unit) : Screen
                 ))
                 // Publish builds only: the announce lets peers (REM) open a link to the app.
                 if (Variant.source.markerOps() != null) {
+                    addView(heading("HUB"))
+                    val saved = Prefs.hub(activity)
+                    addView(hubField(hubAddress, "Address", "host:port", saved.address))
+                    addView(hubField(hubDestination, "Destination", "hub lxmf.delivery hash (32 hex)", saved.destination))
+                    addView(hubField(hubTeam, "Team UID", "optional RCH team UID (32 hex)", saved.teamUid))
+                    addView(LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        addView(View(activity), LinearLayout.LayoutParams(0, WRAP_CONTENT, 7f))
+                        addView(action("SAVE") { saveHub() }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1.5f))
+                        addView(action("CLEAR") {
+                            Prefs.setHub(activity, Prefs.Hub(null, null, null))
+                            listOf(hubAddress, hubDestination, hubTeam).forEach { it.text.clear() }
+                        }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1.5f))
+                    })
+                    addView(text(
+                        "The hub's Reticulum TCP address and LXMF destination, and the team the app's markers go " +
+                            "to. Kept in this app's private storage; used from the next MESH → START PUBLISH.",
+                        frame.mono, 12f, Hud.DIM,
+                    ))
                     addView(heading("MESH ANNOUNCE"))
                     addView(LinearLayout(activity).apply {
                         orientation = LinearLayout.HORIZONTAL
@@ -128,9 +151,8 @@ class SettingsScreen(private val activity: Activity, close: () -> Unit) : Screen
                 addView(heading("BUILD CONFIGURATION (READ-ONLY)"))
                 addView(config)
                 addView(text(
-                    "Hub address, hub destination, team UID and the DJI app key are set when the app is built, " +
-                        "as Gradle properties outside the repository (packaging/android/README.md). " +
-                        "They cannot be changed here, and the DJI key is never shown.",
+                    "The DJI app key is set when the app is built, as a Gradle property outside the repository " +
+                        "(packaging/android/README.md), and is never shown. Hub values here are the ones in use.",
                     frame.mono, 12f, Hud.DIM,
                 ).apply { setPadding(0, p, 0, 0) })
             })
@@ -138,6 +160,41 @@ class SettingsScreen(private val activity: Activity, close: () -> Unit) : Screen
         showRanges()
         showStream()
         showQualities()
+    }
+
+    private fun hubField(input: EditText, label: String, hint: String, value: String?) = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(text(label, frame.label, 15f, Hud.WHITE), LinearLayout.LayoutParams(0, WRAP_CONTENT, 3f))
+        addView(input.apply {
+            this.hint = hint
+            setText(value.orEmpty())
+            typeface = frame.mono
+            textSize = 13f
+            setTextColor(Hud.WHITE)
+            setHintTextColor(Hud.DIM)
+            isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+            contentDescription = "Hub $label"
+        }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 7f))
+    }
+
+    private fun saveHub() {
+        val address = hubAddress.text.toString().trim()
+        val destination = hubDestination.text.toString().trim().lowercase()
+        val team = hubTeam.text.toString().trim().lowercase().ifEmpty { null }
+        val problem = when {
+            !Prefs.validHubAddress(address) -> "Address must be host:port"
+            !Prefs.validHex32(destination) -> "Destination must be 32 hex digits"
+            team != null && !Prefs.validHex32(team) -> "Team UID must be 32 hex digits"
+            else -> null
+        }
+        if (problem != null) {
+            Toast.makeText(activity, problem, Toast.LENGTH_LONG).show()
+            return
+        }
+        Prefs.setHub(activity, Prefs.Hub(address, destination, team))
+        Toast.makeText(activity, "Hub saved; used from the next START PUBLISH", Toast.LENGTH_SHORT).show()
     }
 
     private fun showQualities() {

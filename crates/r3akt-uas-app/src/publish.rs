@@ -842,7 +842,10 @@ mod tests {
         }
     }
 
-    const BLUE: &str = "43341e5c822d99857fa6e8641f2ca9c0";
+    /// RCH's canonical BLUE team UID, from the shared profile.
+    fn blue() -> &'static str {
+        r3akt_profile_rch::teams::canonical_team_uid_for_color("BLUE").unwrap()
+    }
 
     fn decode_one(id: &AppIdentity, s: &TelemetrySample, team: Option<&str>) -> OriginPosition {
         let bytes = fix_message(id, s, team).unwrap();
@@ -862,7 +865,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("r3akt-uas-publish-{}", std::process::id()));
         let id = AppIdentity::load_or_create(&dir).unwrap();
 
-        for team in [None, Some(BLUE)] {
+        for team in [None, Some(blue())] {
             let msl = decode_one(&id, &sample(AltitudeReference::Msl), team);
             assert_eq!(
                 (msl.lat, msl.lon, msl.fix_at_ms),
@@ -891,7 +894,7 @@ mod tests {
         }
         // With a team the message is the shared object message (field 3 present);
         // without one it is still step 2a's field-13-only message.
-        let with_team = fix_message(&id, &sample(AltitudeReference::Msl), Some(BLUE)).unwrap();
+        let with_team = fix_message(&id, &sample(AltitudeReference::Msl), Some(blue())).unwrap();
         let without = fix_message(&id, &sample(AltitudeReference::Msl), None).unwrap();
         let keys = |b: &[u8]| {
             let mut k: Vec<String> = r3akt_map_core::msgpack::to_json(b)
@@ -947,7 +950,7 @@ mod tests {
         let err = publish_start(
             String::new(),
             "127.0.0.1:1".to_owned(),
-            BLUE,
+            blue(),
             Some("00112233445566778899aabbccddeeff".to_owned()),
         );
         assert!(
@@ -957,13 +960,12 @@ mod tests {
 
     #[test]
     fn team_uid_is_lower_cased_and_checked() {
-        assert_eq!(hex32(&BLUE.to_ascii_uppercase(), "team UID").unwrap(), BLUE);
-        for bad in [
-            "Blue",
-            "",
-            "43341e5c822d99857fa6e8641f2ca9c",
-            "43341e5c822d99857fa6e8641f2ca9cz",
-        ] {
+        assert_eq!(
+            hex32(&blue().to_ascii_uppercase(), "team UID").unwrap(),
+            blue()
+        );
+        let short = &blue()[..31];
+        for bad in ["Blue", "", short, &format!("{short}z")] {
             assert!(matches!(
                 hex32(bad, "team UID"),
                 Err(PublishError::Config { .. })
